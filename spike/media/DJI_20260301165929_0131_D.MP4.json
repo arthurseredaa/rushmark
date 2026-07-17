@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "identity": {
+    "filename": "DJI_20260301165929_0131_D.MP4",
+    "drive_file_id": null
+  },
+  "technical": {
+    "codec": "hevc",
+    "width": 3840,
+    "height": 2160,
+    "frame_rate": {
+      "num": 24000,
+      "den": 1001
+    },
+    "duration_frames": 247,
+    "rate_mode": "constant",
+    "source_timecode_frames": 1631008
+  },
+  "authored": {
+    "comments": "Spike test: verifying CSV metadata import and OTIO marker mapping.",
+    "keywords": [
+      "resolve-check",
+      "spike",
+      "test"
+    ]
+  },
+  "markers": [
+    {
+      "frame": 0,
+      "duration_frames": 0,
+      "name": "Marker 1 @ frame 0",
+      "note": "Cut in here",
+      "color": "RED"
+    },
+    {
+      "frame": 123,
+      "duration_frames": 24,
+      "name": "Marker 2 @ frame 123",
+      "note": "Best delivery of the line",
+      "color": "GREEN"
+    },
+    {
+      "frame": 246,
+      "duration_frames": 0,
+      "name": "Marker 3 @ frame 246",
+      "note": "Hold on this before the cut",
+      "color": "BLUE"
+    }
+  ],
+  "provenance": {
+    "authored_by": "manual",
+    "app_version": "0.0.0-spike",
+    "written_at": "2026-07-17T00:00:00Z"
+  }
+}

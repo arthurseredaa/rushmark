@@ -1,0 +1,32 @@
+# Video files — never commit footage.
+# Git keeps binaries in history forever, even after deletion. The spike clip is
+# 68 MB of personal footage and is fully replaceable: drop any clip into
+# spike/media/ and regenerate (see spike/README.md).
+*.mp4
+*.MP4
+*.mov
+*.MOV
+*.m4v
+*.mxf
+*.braw
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Expo / React Native (for when the app lands)
+.expo/
+dist/
+web-build/
+ios/Pods/
+ios/build/
+*.xcuserstate
+
+# Env / secrets — Google OAuth client IDs live here
+.env
+.env.local
+*.keystore
+
+# macOS
+.DS_Store

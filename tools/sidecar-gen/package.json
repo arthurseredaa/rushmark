@@ -1,0 +1,12 @@
+{
+  "name": "sidecar-gen",
+  "version": "0.0.0-spike",
+  "private": true,
+  "type": "module",
+  "description": "Phase 0 spike: generate canonical .json + Resolve .csv + .otio for one video. Retained afterwards as the golden-fixture source.",
+  "bin": { "sidecar-gen": "./generate.js" },
+  "scripts": {
+    "generate": "node generate.js"
+  },
+  "engines": { "node": ">=20" }
+}
