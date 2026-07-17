@@ -11,6 +11,8 @@ description: "Task list template for feature implementation"
 
 **Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
 
+**Constitution-mandated verification is NOT optional**, regardless of the stance above. Check `.specify/memory/constitution.md`: where a principle demands specific verification, include those tasks even if the spec does not request tests. For Rushmark v1.0.0 this means frame-math round-trips at every supported rate (Principle I) and golden-file tests pinning projection determinism (Principle III).
+
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
 ## Format: `[ID] [P?] [Story] Description`

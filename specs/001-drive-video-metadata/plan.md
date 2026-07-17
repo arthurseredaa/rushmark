@@ -36,18 +36,21 @@ An iOS-only React Native app that connects to Google Drive folders of video, pla
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-`.specify/memory/constitution.md` is an **unfilled template** — every principle is still a `[PRINCIPLE_N_NAME]` placeholder with no content. There are no ratified project principles to check this design against, so no gates apply and none can fail.
+Checked against **Rushmark Constitution v1.0.0** (ratified 2026-07-17).
 
-**Status**: PASS (vacuously — no constitution in force).
+**Status**: PASS — all three principles satisfied, one bounded exception recorded.
 
-**Recommendation**: run `/speckit-constitution` before implementation. This feature has two candidate principles that are already load-bearing in the spec and would be worth ratifying, since they are the rules most likely to be quietly traded away under pressure:
+| Principle | How this design satisfies it |
+|---|---|
+| **I. Exactness Over Convenience** (NON-NEGOTIABLE) | Rates are `Rational{num,den}` end to end, never floats (`src/domain/rational.ts`). The native bridge speaks **integer frames only** — D2 rejects every off-the-shelf RN player precisely because they convert `CMTime` to a JS float, destroying exactness before our code sees it. `seekToFrame` resolves to the frame actually landed on. `Probe.rateMode` gates marker authoring: `variable` or `unknown` → refuse and explain (FR-019/FR-019a). VFR detection reads real sample timings rather than trusting `nominalFrameRate`, which lies about VFR footage (D3). |
+| **II. Never Lose Authored Work** | Pending saves live in SQLite, durable across restarts (D8); the state machine has **no `pending → discarded` edge** (data-model.md). Failures keep the save queued with its cause surfaced (FR-038). Unrecognized fields are parked in `unknownFields` and deep-merged back on write (D11, FR-023b). Cache clearing is a filesystem operation and **cannot reach the database** — FR-036 holds by construction, which is what the principle demands. |
+| **III. The Canonical Record Is The Only Authority** | `.csv` and `.otio` are pure functions in `src/domain/projections/`, deterministic and golden-tested (SC-010). The canonical is written **last** so a stale projection is a consistent old state (D9). Editor quirks stay in the projection layer — proven by the spike: OTIO's media-timecode coordinate bug (F13) lived entirely in `otio.ts` and was fixed by changing one writer; the canonical model kept 0-based offsets and was never touched. Schema version is recorded but diagnostic, not a read gate (D11). |
 
-1. **Exactness over convenience** — never approximate a frame position; fail loudly and explain instead (SC-001, SC-009, SC-014, NFR-1).
-2. **Never lose authored work** — offline edits, pending saves, and unrecognized sidecar fields all survive; no code path discards user input to simplify a flow (FR-023b, FR-035, FR-038).
+**Additional constraints**: client-only ✅ (no backend; Drive REST direct). Single user ✅ (last-write-wins, stated as an accepted consequence). iOS only ✅. Format assumptions verified against the real tool ✅ — the Phase 0 spike ran against DaVinci Resolve on real footage and corrected three guesses (BOM, CSV headers, coordinate system).
 
-This is advisory. Absence of a constitution is not a blocker, and no Complexity Tracking entries are needed.
+**Complexity Tracking**: one entry — D9's set-level atomicity (see below).
 
-**Post-design re-check (after Phase 1)**: PASS, unchanged — still no constitution in force. The design added no new projects, services, or indirection layers: one app, one native module, three stores (SQLite, filesystem, Drive) each with a distinct and necessary role. Had the two candidate principles above been ratified, the design would satisfy both — the frame path is integer-only end to end with no float conversion anywhere (D2, contracts/native-player.md), and no code path discards authored work (D9 retry-forever queue, D11 field preservation). The one deliberate compromise, D9's set-level atomicity, is documented in the open rather than papered over.
+**Post-design re-check (after Phase 1)**: PASS, unchanged. The design adds no new projects, services, or indirection: one app, one native module, three stores each with a distinct and necessary role. The Phase 0 spike has since validated Principles I and III against the real editor — markers map 1:1 on exact frames, and the one bug found was contained in the projection layer exactly as Principle III predicts.
 
 ## Project Structure
 
@@ -61,8 +64,8 @@ specs/001-drive-video-metadata/
 ├── quickstart.md        # Phase 1 output — how to run and validate
 ├── contracts/           # Phase 1 output
 │   ├── canonical-json.md    # The source-of-truth sidecar schema (v1)
-│   ├── resolve-csv.md       # CSV projection (spike-gated)
-│   ├── otio.md              # OTIO projection (spike-gated)
+│   ├── resolve-csv.md       # CSV projection (✅ confirmed vs Resolve)
+│   ├── otio.md              # OTIO projection (✅ confirmed vs Resolve)
 │   ├── drive-api.md         # Which Drive v3 calls we depend on
 │   └── native-player.md     # JS ↔ Swift frame-accurate player interface
 ├── checklists/
@@ -127,4 +130,13 @@ tools/
 
 ## Complexity Tracking
 
-> No constitution is in force, so there are no violations to justify. Table intentionally empty.
+> One bounded compromise, recorded in the open as the Development Workflow requires.
+
+| Item | Why needed | Simpler alternative rejected because |
+|---|---|---|
+| **D9: set-level atomicity is convergent, not transactional.** A video's three sidecars can briefly disagree (projections updated, canonical not yet) if the app dies mid-publish. | Google Drive offers **no multi-file transaction**. Individual uploads *are* atomic, so FR-028's real requirement — no corrupt or unreadable sidecar — holds absolutely. The residual window is a *stale* projection, which is milder, lasts seconds, is single-user, and self-heals via the retry queue that already exists for offline. Mitigated by writing the canonical **last**, so a stale projection beside an old canonical is a consistent old state. | *Upload to temp names then rename all three*: Drive renames aren't atomic across files either — identical window, more calls, more failure modes. *Silently allow partial sets*: violates the spec's intent and Principle III's regenerability. **No available alternative closes the window**; claiming a guarantee the platform cannot provide would be worse than stating the limit. |
+
+This is not a principle violation — no authored work is lost (Principle II: the save stays queued
+and retries), and projections remain fully regenerable from the canonical (Principle III). It is a
+platform limit that the Development Workflow requires be documented rather than described as a
+guarantee.
