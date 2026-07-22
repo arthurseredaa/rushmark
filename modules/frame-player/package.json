@@ -1,0 +1,7 @@
+{
+  "name": "frame-player",
+  "version": "1.0.0",
+  "description": "Frame-exact AVFoundation playback for Rushmark. Integer frames only — never seconds.",
+  "main": "src/index.ts",
+  "private": true
+}

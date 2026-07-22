@@ -51,6 +51,18 @@ Useful flags: `--url-form absolute|name|dot`, `--marker-base tc|zero`, `--csv-va
 
 ## Still open (non-blocking)
 
-- **Marker notes**: does Resolve read `Marker.metadata.note`? Untested. Fallback ready: `--note-in-name`.
+- **Marker notes**: does Resolve read `Marker.metadata.note`? Untested. Fallback ready: `--note-in-name` here, `noteInName` in `src/domain/projections/otio.ts`.
 - **Palette**: only Red/Green/Blue verified. Cyan, Yellow, Pink, Purple untested.
 - **Non-ASCII**: the BOM protected non-Latin text and is now gone. Untested — matters if comments are ever written in Cyrillic.
+
+These are tasks T065–T067. Each needs Resolve and real footage; each is a question the app now has a concrete answer path for.
+
+## These files are now a test fixture
+
+`tests/golden/projections.test.ts` reproduces all three sidecars **byte-for-byte** from `src/domain/`, using the input recorded in `tests/golden/fixtures.ts`. The spike's output is no longer just evidence — it is the regression lock on the three findings that cost the most to learn:
+
+- an OTIO range offset by anything other than the media timecode fails the suite (F13)
+- a BOM on the CSV fails the suite (F7)
+- dropping `Start TC`/`End TC` fails the suite (D13a)
+
+If you change a writer and these fail, the writer is wrong. The fixtures were confirmed by a real import.
