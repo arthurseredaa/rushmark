@@ -85,9 +85,9 @@ describe('mergeUnknownFields', () => {
 
 describe('round trip: an older build must not delete a newer build’s fields', () => {
   it('preserves unknown fields verbatim through read -> edit -> write', () => {
-    // A sidecar from the future: schema 2, with sections we have never seen.
+    // A sidecar from the future: schema 3, with sections we have never seen.
     const fromTheFuture = {
-      schema_version: 2,
+      schema_version: 3,
       identity: { filename: SPIKE_FILENAME, drive_file_id: null },
       technical: {
         codec: 'hevc',

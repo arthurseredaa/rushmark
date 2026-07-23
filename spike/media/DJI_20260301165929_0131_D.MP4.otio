@@ -49,6 +49,7 @@
                 "OTIO_SCHEMA": "Marker.2",
                 "name": "Marker 1 @ frame 0",
                 "color": "RED",
+                "comment": "Cut in here",
                 "marked_range": {
                   "OTIO_SCHEMA": "TimeRange.1",
                   "start_time": {
@@ -62,14 +63,13 @@
                     "rate": 23.976023976023978
                   }
                 },
-                "metadata": {
-                  "note": "Cut in here"
-                }
+                "metadata": {}
               },
               {
                 "OTIO_SCHEMA": "Marker.2",
                 "name": "Marker 2 @ frame 123",
                 "color": "GREEN",
+                "comment": "Best delivery of the line",
                 "marked_range": {
                   "OTIO_SCHEMA": "TimeRange.1",
                   "start_time": {
@@ -83,14 +83,13 @@
                     "rate": 23.976023976023978
                   }
                 },
-                "metadata": {
-                  "note": "Best delivery of the line"
-                }
+                "metadata": {}
               },
               {
                 "OTIO_SCHEMA": "Marker.2",
                 "name": "Marker 3 @ frame 246",
                 "color": "BLUE",
+                "comment": "Hold on this before the cut",
                 "marked_range": {
                   "OTIO_SCHEMA": "TimeRange.1",
                   "start_time": {
@@ -104,9 +103,7 @@
                     "rate": 23.976023976023978
                   }
                 },
-                "metadata": {
-                  "note": "Hold on this before the cut"
-                }
+                "metadata": {}
               }
             ]
           }

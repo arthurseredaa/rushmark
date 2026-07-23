@@ -34,7 +34,13 @@ const KNOWN: Record<string, unknown> = {
     rate_mode: true,
     source_timecode_frames: true,
   },
-  authored: { comments: true, keywords: true },
+  authored: {
+    comments: true,
+    keywords: true,
+    description: true,
+    people: true,
+    good_take: true,
+  },
   markers: true,
   provenance: { authored_by: true, app_version: true, written_at: true },
 };

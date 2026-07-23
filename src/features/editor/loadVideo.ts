@@ -22,6 +22,9 @@ import * as queue from '@/data/sync/queue';
 export type LoadedMetadata = {
   comments: string;
   keywords: string[];
+  description: string;
+  people: string[];
+  goodTake: boolean;
   markers: Marker[];
   unknownFields: Record<string, unknown>;
   warnings: ParseWarning[];
@@ -33,6 +36,9 @@ export type LoadedMetadata = {
 const EMPTY: Omit<LoadedMetadata, 'source' | 'pending'> = {
   comments: '',
   keywords: [],
+  description: '',
+  people: [],
+  goodTake: false,
   markers: [],
   unknownFields: {},
   warnings: [],
@@ -47,6 +53,9 @@ async function fromLocal(
   return {
     comments: row.comments,
     keywords: row.keywords,
+    description: row.description,
+    people: row.people,
+    goodTake: row.goodTake,
     markers: await metadata.getMarkers(db, videoId),
     unknownFields: row.unknownFields,
     warnings: [],
@@ -116,6 +125,9 @@ export async function loadVideo(
         videoId: input.videoId,
         comments: parsed.comments,
         keywords: parsed.keywords,
+        description: parsed.description,
+        people: parsed.people,
+        goodTake: parsed.goodTake,
         markers: parsed.markers,
         unknownFields: parsed.unknownFields,
         syncState: 'published',
@@ -126,6 +138,9 @@ export async function loadVideo(
       return {
         comments: parsed.comments,
         keywords: parsed.keywords,
+        description: parsed.description,
+        people: parsed.people,
+        goodTake: parsed.goodTake,
         markers: parsed.markers,
         unknownFields: parsed.unknownFields,
         warnings: parsed.warnings,

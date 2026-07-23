@@ -76,8 +76,6 @@ export function buildTargetUrl(
 }
 
 export type OtioOptions = {
-  /** Fallback for the open question in T065: does Resolve read Marker.metadata.note? */
-  noteInName?: boolean;
   urlForm?: UrlForm;
   absoluteDir?: string | null;
   /** 'tc' is the verified default. 'zero' exists only to reproduce the F13 bug in tests. */
@@ -85,12 +83,7 @@ export type OtioOptions = {
 };
 
 export function buildOtio(canonical: Canonical, options: OtioOptions = {}): unknown {
-  const {
-    noteInName = false,
-    urlForm = 'name',
-    absoluteDir = null,
-    markerBase = 'tc',
-  } = options;
+  const { urlForm = 'name', absoluteDir = null, markerBase = 'tc' } = options;
 
   const t = canonical.technical;
   if (!t.frame_rate) throw new Error('cannot build OTIO without an exact frame rate');
@@ -122,10 +115,15 @@ export function buildOtio(canonical: Canonical, options: OtioOptions = {}): unkn
 
   const markers = canonical.markers.map((m) => ({
     OTIO_SCHEMA: SCHEMAS.marker,
-    name: noteInName && m.note ? `${m.name} — ${m.note}` : m.name,
+    name: m.name,
     color: m.color,
+    // The note goes in OTIO's first-class `comment` field (Marker.2), the
+    // schema-blessed home for it. It previously lived in `metadata`, the generic
+    // app-namespaced sub-dict adapters do not interpret — which is why marker
+    // notes never surfaced in Resolve. PENDING re-confirmation on the next import.
+    comment: m.note,
     marked_range: timeRange(markerOffset + m.frame, m.duration_frames, rate),
-    metadata: m.note ? { note: m.note } : {},
+    metadata: {},
   }));
 
   return {

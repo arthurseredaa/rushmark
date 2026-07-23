@@ -32,6 +32,9 @@ export type MetadataRow = {
   videoId: string;
   comments: string;
   keywords: string[];
+  description: string;
+  people: string[];
+  goodTake: boolean;
   schemaVersion: number;
   unknownFields: Record<string, unknown>;
   dirty: boolean;
@@ -162,6 +165,9 @@ type RawMetadataRow = {
   videoId: string;
   comments: string;
   keywords: string;
+  description: string;
+  people: string;
+  goodTake: number;
   schemaVersion: number;
   unknownFields: string;
   dirty: number;
@@ -191,6 +197,9 @@ export const metadata = {
       videoId: row.videoId,
       comments: row.comments,
       keywords: JSON.parse(row.keywords) as string[],
+      description: row.description,
+      people: JSON.parse(row.people) as string[],
+      goodTake: row.goodTake === 1,
       schemaVersion: row.schemaVersion,
       unknownFields: JSON.parse(row.unknownFields) as Record<string, unknown>,
       dirty: row.dirty === 1,
@@ -227,6 +236,9 @@ export const metadata = {
       videoId: string;
       comments: string;
       keywords: readonly string[];
+      description?: string;
+      people?: readonly string[];
+      goodTake?: boolean;
       markers: readonly Marker[];
       unknownFields?: Record<string, unknown>;
       syncState: SyncState;
@@ -237,11 +249,15 @@ export const metadata = {
     await db.withTransactionAsync(async () => {
       await db.runAsync(
         `INSERT INTO video_metadata
-           (videoId, comments, keywords, schemaVersion, unknownFields, dirty, syncState, lastPublishedAt)
-         VALUES (?, ?, ?, 1, ?, ?, ?, ?)
+           (videoId, comments, keywords, description, people, goodTake, schemaVersion, unknownFields, dirty, syncState, lastPublishedAt)
+         VALUES (?, ?, ?, ?, ?, ?, 2, ?, ?, ?, ?)
          ON CONFLICT(videoId) DO UPDATE SET
            comments = excluded.comments,
            keywords = excluded.keywords,
+           description = excluded.description,
+           people = excluded.people,
+           goodTake = excluded.goodTake,
+           schemaVersion = excluded.schemaVersion,
            unknownFields = excluded.unknownFields,
            dirty = excluded.dirty,
            syncState = excluded.syncState,
@@ -250,6 +266,9 @@ export const metadata = {
           input.videoId,
           input.comments,
           JSON.stringify([...input.keywords].sort()),
+          input.description ?? '',
+          JSON.stringify([...(input.people ?? [])].sort()),
+          input.goodTake ? 1 : 0,
           JSON.stringify(input.unknownFields ?? {}),
           input.dirty ? 1 : 0,
           input.syncState,

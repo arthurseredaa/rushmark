@@ -78,6 +78,24 @@ export function buildCsv(canonical: Canonical, options: CsvOptions = {}): string
     canonical.authored.keywords.join(separator),
   ];
 
+  // Schema-v2 fields, emitted as columns only when populated — Resolve exchanges
+  // only populated metadata, and a populated-only CSV keeps the golden output
+  // byte-stable for videos that use none of them. Column spellings ("Description",
+  // "People", "Good Take") and the Good Take token are PENDING a Resolve import.
+  const a = canonical.authored;
+  if (a.description) {
+    headers.push('Description');
+    values.push(a.description);
+  }
+  if (a.people.length) {
+    headers.push('People');
+    values.push(a.people.join(separator));
+  }
+  if (a.good_take) {
+    headers.push('Good Take');
+    values.push('true');
+  }
+
   const tc = timecode ? timecodeColumns(canonical) : null;
   if (tc) {
     headers.push('Start TC', 'End TC');

@@ -75,6 +75,14 @@ const MIGRATIONS: readonly string[] = [
   );
   CREATE INDEX idx_keywords ON video_keywords(keyword);
   `,
+  // v2 — richer whole-video metadata (Description, People, Good Take). Additive:
+  // existing rows default to empty, so no data is touched. schemaVersion in the
+  // canonical is bumped separately in src/domain/canonical.ts.
+  `
+  ALTER TABLE video_metadata ADD COLUMN description TEXT NOT NULL DEFAULT '';
+  ALTER TABLE video_metadata ADD COLUMN people TEXT NOT NULL DEFAULT '[]';
+  ALTER TABLE video_metadata ADD COLUMN goodTake INTEGER NOT NULL DEFAULT 0;
+  `,
 ];
 
 export async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {

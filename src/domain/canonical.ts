@@ -11,7 +11,7 @@ import { orderMarkers, validateMarkers } from './markers';
 import type { Rational } from './rational';
 import { extractUnknownFields } from './unknownFields';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const PALETTE = ['RED', 'GREEN', 'BLUE', 'CYAN', 'YELLOW', 'PINK', 'PURPLE'] as const;
 export type MarkerColor = (typeof PALETTE)[number];
@@ -73,6 +73,12 @@ export type Canonical = {
   authored: {
     comments: string;
     keywords: string[];
+    /** Free-text Description — a distinct Resolve field from Comments (schema v2). */
+    description: string;
+    /** People / cast tags, like keywords but a dedicated Resolve field (schema v2). */
+    people: string[];
+    /** Resolve's Good Take flag (schema v2). */
+    good_take: boolean;
   };
   markers: CanonicalMarker[];
   provenance: {
@@ -88,6 +94,9 @@ export type BuildCanonicalInput = {
   probe: Probe;
   comments?: string;
   keywords?: readonly string[];
+  description?: string;
+  people?: readonly string[];
+  goodTake?: boolean;
   markers: readonly Marker[];
   appVersion?: string;
   writtenAt?: string;
@@ -102,6 +111,9 @@ export function buildCanonical(input: BuildCanonicalInput): Canonical {
     probe,
     comments,
     keywords,
+    description,
+    people,
+    goodTake,
     markers,
     appVersion,
     writtenAt,
@@ -127,6 +139,9 @@ export function buildCanonical(input: BuildCanonicalInput): Canonical {
     authored: {
       comments: comments ?? '',
       keywords: [...(keywords ?? [])].sort(), // sorted for determinism
+      description: description ?? '',
+      people: [...(people ?? [])].sort(), // sorted for determinism, like keywords
+      good_take: goodTake ?? false,
     },
     markers: orderMarkers(markers).map((m) => ({
       frame: m.frame,
@@ -159,6 +174,9 @@ export type ParseWarning = { field: string; message: string };
 export type ParsedCanonical = {
   comments: string;
   keywords: string[];
+  description: string;
+  people: string[];
+  goodTake: boolean;
   markers: Marker[];
   schemaVersion: number | null;
   /** Everything this build did not recognize, preserved verbatim (FR-023b). */
@@ -188,6 +206,9 @@ export function parseCanonical(raw: unknown): ParsedCanonical {
     return {
       comments: '',
       keywords: [],
+      description: '',
+      people: [],
+      goodTake: false,
       markers: [],
       schemaVersion: null,
       unknownFields: {},
@@ -234,6 +255,33 @@ export function parseCanonical(raw: unknown): ParsedCanonical {
     warnings.push({ field: 'authored.keywords', message: 'Not an array; ignored.' });
   }
 
+  let description = '';
+  if (typeof authored.description === 'string') {
+    description = authored.description;
+  } else if (authored.description !== undefined) {
+    warnings.push({ field: 'authored.description', message: 'Not a string; ignored.' });
+  }
+
+  let people: string[] = [];
+  if (Array.isArray(authored.people)) {
+    people = authored.people.filter((p): p is string => typeof p === 'string');
+    if (people.length !== authored.people.length) {
+      warnings.push({
+        field: 'authored.people',
+        message: 'Some people were not strings and were ignored.',
+      });
+    }
+  } else if (authored.people !== undefined) {
+    warnings.push({ field: 'authored.people', message: 'Not an array; ignored.' });
+  }
+
+  let goodTake = false;
+  if (typeof authored.good_take === 'boolean') {
+    goodTake = authored.good_take;
+  } else if (authored.good_take !== undefined) {
+    warnings.push({ field: 'authored.good_take', message: 'Not a boolean; ignored.' });
+  }
+
   const markers: Marker[] = [];
   if (Array.isArray(raw.markers)) {
     raw.markers.forEach((m: unknown, index: number) => {
@@ -276,6 +324,9 @@ export function parseCanonical(raw: unknown): ParsedCanonical {
   return {
     comments,
     keywords,
+    description,
+    people,
+    goodTake,
     markers,
     schemaVersion,
     unknownFields: extractUnknownFields(raw),

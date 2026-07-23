@@ -18,7 +18,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { buildCanonical, serializeCanonical } from '@/domain/canonical';
+import { buildCanonical, parseCanonical, serializeCanonical } from '@/domain/canonical';
 import { buildCsv } from '@/domain/projections/csv';
 import { buildOtio, serializeOtio } from '@/domain/projections/otio';
 
@@ -167,6 +167,22 @@ describe('.otio projection', () => {
     expect(markers[1].marked_range.duration.value).toBe(24);
   });
 
+  it('carries the note in the native `comment` field, not metadata [item 3]', () => {
+    // OTIO Marker.2 has a first-class `comment`; the generic `metadata` sub-dict
+    // is app-namespaced and adapters do not read it as a note, which is why
+    // marker notes never surfaced in Resolve. PENDING Resolve re-confirmation.
+    const parsed = JSON.parse(otio);
+    const markers = parsed.tracks.children[0].children[0].markers;
+    expect(markers.map((m: { comment: string }) => m.comment)).toEqual([
+      'Cut in here',
+      'Best delivery of the line',
+      'Hold on this before the cut',
+    ]);
+    expect(markers.every((m: { metadata: object }) => Object.keys(m.metadata).length === 0)).toBe(
+      true,
+    );
+  });
+
   it('emits the full float expansion of 24000/1001, never 23.976 [F12]', () => {
     expect(otio).toContain('23.976023976023978');
     expect(otio).not.toMatch(/"rate": 23\.976\b/);
@@ -210,6 +226,50 @@ describe('.otio projection', () => {
     // 0-based markers against a timecode-based clip range: exactly the state
     // that made Resolve report "The clip was not found".
     expect(markers[0].marked_range.start_time.value).toBe(0);
+  });
+});
+
+describe('schema v2 authored fields — Description, People, Good Take', () => {
+  const v2 = buildCanonical({
+    filename: SPIKE_FILENAME,
+    driveFileId: null,
+    probe: SPIKE_PROBE,
+    comments: 'c',
+    keywords: ['k'],
+    description: 'A quiet establishing shot.',
+    people: ['Bob', 'Alice'],
+    goodTake: true,
+    markers: [],
+    appVersion: SPIKE_APP_VERSION,
+    writtenAt: SPIKE_WRITTEN_AT,
+  });
+
+  it('stamps the canonical at schema_version 2', () => {
+    expect(v2.schema_version).toBe(2);
+  });
+
+  it('sorts people for determinism, like keywords', () => {
+    expect(v2.authored.people).toEqual(['Alice', 'Bob']);
+  });
+
+  it('adds a CSV column only for a populated field', () => {
+    const csv = buildCsv(v2);
+    const [header] = csv.split('\r\n');
+    expect(header).toBe('File Name,Comments,Keywords,Description,People,Good Take,Start TC,End TC');
+  });
+
+  it('omits the v2 columns entirely when those fields are empty', () => {
+    // Populated-only keeps the common case byte-identical to the v1 golden CSV.
+    const [header] = buildCsv(canonical).split('\r\n');
+    expect(header).toBe('File Name,Comments,Keywords,Start TC,End TC');
+  });
+
+  it('round-trips the v2 fields through the canonical read path', () => {
+    const parsed = parseCanonical(JSON.parse(serializeCanonical(v2)));
+    expect(parsed.description).toBe('A quiet establishing shot.');
+    expect(parsed.people).toEqual(['Alice', 'Bob']);
+    expect(parsed.goodTake).toBe(true);
+    expect(parsed.unknownFields).toEqual({});
   });
 });
 

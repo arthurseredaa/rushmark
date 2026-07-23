@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "identity": {
     "filename": "DJI_20260301165929_0131_D.MP4",
     "drive_file_id": null
@@ -22,7 +22,10 @@
       "resolve-check",
       "spike",
       "test"
-    ]
+    ],
+    "description": "",
+    "people": [],
+    "good_take": false
   },
   "markers": [
     {

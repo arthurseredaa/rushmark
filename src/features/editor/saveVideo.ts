@@ -23,6 +23,9 @@ export type SaveInput = {
   probe: Probe;
   comments: string;
   keywords: readonly string[];
+  description: string;
+  people: readonly string[];
+  goodTake: boolean;
   markers: readonly Marker[];
   unknownFields?: Record<string, unknown>;
   appVersion?: string;
@@ -38,9 +41,17 @@ export type SaveOutcome =
 const isEmpty = (input: {
   comments: string;
   keywords: readonly string[];
+  description: string;
+  people: readonly string[];
+  goodTake: boolean;
   markers: readonly Marker[];
 }): boolean =>
-  input.comments.trim() === '' && input.keywords.length === 0 && input.markers.length === 0;
+  input.comments.trim() === '' &&
+  input.keywords.length === 0 &&
+  input.description.trim() === '' &&
+  input.people.length === 0 &&
+  !input.goodTake &&
+  input.markers.length === 0;
 
 export function buildCanonicalFor(input: SaveInput): Canonical {
   return buildCanonical({
@@ -49,6 +60,9 @@ export function buildCanonicalFor(input: SaveInput): Canonical {
     probe: input.probe,
     comments: input.comments,
     keywords: input.keywords,
+    description: input.description,
+    people: input.people,
+    goodTake: input.goodTake,
     markers: input.markers,
     appVersion: input.appVersion ?? '1.0.0',
     // Left to default (now): the canonical records when it was written.
@@ -99,6 +113,9 @@ export async function saveVideo(
     videoId: input.videoId,
     comments: input.comments,
     keywords: input.keywords,
+    description: input.description,
+    people: input.people,
+    goodTake: input.goodTake,
     markers: input.markers,
     unknownFields: input.unknownFields ?? {},
     syncState: online ? 'local-only' : 'pending',
