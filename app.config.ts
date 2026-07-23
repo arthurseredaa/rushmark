@@ -31,6 +31,9 @@ const config: ExpoConfig = {
     'expo-router',
     'expo-dev-client',
     'expo-sqlite',
+    // Local notifications for finished background downloads (FR-006e). No push
+    // server — client-only, per NFR-2.
+    'expo-notifications',
     [
       '@react-native-google-signin/google-signin',
       {

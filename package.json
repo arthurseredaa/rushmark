@@ -9,6 +9,7 @@
     "prebuild": "expo prebuild -p ios",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:native": "bash scripts/check-native-probe.sh",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "android": "expo run:android"
@@ -23,6 +24,7 @@
     "expo-dev-client": "~6.0.21",
     "expo-file-system": "~19.0.23",
     "expo-linking": "~8.0.12",
+    "expo-notifications": "~0.32.17",
     "expo-router": "~6.0.24",
     "expo-sqlite": "~16.0.10",
     "expo-status-bar": "~3.0.9",
