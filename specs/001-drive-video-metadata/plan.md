@@ -1,3 +1,7 @@
+---
+description: "Implementation plan for Drive Video Metadata Producer"
+---
+
 # Implementation Plan: Drive Video Metadata Producer
 
 **Branch**: `001-drive-video-metadata` | **Date**: 2026-07-16 | **Spec**: [spec.md](./spec.md)
@@ -11,6 +15,8 @@ An iOS-only React Native app that connects to Google Drive folders of video, pla
 > **Phase 0 spike: ✅ PASSED (2026-07-17)** — verified against DaVinci Resolve on the user's real 23.976 DJI footage. Markers map 1:1 onto exact frames (including frame 0 and the last frame, range durations intact); OTIO's float `rate` carries `24000/1001` losslessly, retiring the plan's biggest risk. `contracts/otio.md` and `contracts/resolve-csv.md` are confirmed, not hypotheses. **Implementation is unblocked.** See research.md §S1-a…S1-d.
 
 **Technical approach**: Expo (bare workflow with a development client, not Expo Go — a custom native module is required). Frame accuracy is delivered by a thin native AVFoundation module exposing zero-tolerance seeking and frame stepping, because no off-the-shelf React Native player exposes the primitives that FR-007, FR-008, and SC-001 require. Local state lives in SQLite (metadata + pending save queue, durable) with video originals in the app's Documents directory (not Caches, which iOS purges under pressure — FR-010 forbids that). Drive is reached over its v3 REST API with tokens from Google Sign-In. The `.otio` and `.csv` writers are pure functions over the canonical model, built and validated by the Phase 0 spike before any app code.
+
+**Folder-picker refinement (2026-07-24)**: Keep the custom picker folder-only. Move the existing current-folder selection trigger from its footer to an **Add** action in the header for every non-root folder, preserving the `onPick({ id, name })` contract and all downstream Drive, SQLite, and routing behavior. Retain an equal-width spacer at `My Drive` so the title stays centered. Add a rendered component regression suite; no Drive, authorization, database, or navigation contract changes.
 
 ## Technical Context
 
@@ -51,6 +57,8 @@ Checked against **Rushmark Constitution v1.0.0** (ratified 2026-07-17).
 **Complexity Tracking**: one entry — D9's set-level atomicity (see below).
 
 **Post-design re-check (after Phase 1)**: PASS, unchanged. The design adds no new projects, services, or indirection: one app, one native module, three stores each with a distinct and necessary role. The Phase 0 spike has since validated Principles I and III against the real editor — markers map 1:1 on exact frames, and the one bug found was contained in the projection layer exactly as Principle III predicts.
+
+**Folder-picker refinement re-check (2026-07-24)**: PASS. The change moves one existing selection affordance and adds component coverage. It does not touch frame representation, authored metadata, canonical/projection authority, persistence, Drive writes, platform scope, or service boundaries.
 
 ## Project Structure
 
@@ -119,6 +127,7 @@ modules/frame-player/            # Expo native module (Swift/AVFoundation)
 
 tests/
 ├── unit/                        # domain logic, rational math, marker validation
+├── component/                   # rendered React Native interaction regressions
 ├── golden/                      # pinned .json/.csv/.otio fixtures (SC-010)
 └── integration/                 # sync engine, offline queue, Drive client (mocked)
 
@@ -127,6 +136,37 @@ tools/
 ```
 
 **Structure Decision**: Single Expo app at the repository root, with the domain layer deliberately isolated from React Native and Drive so the correctness-critical code (rational frame math, marker validation, the three writers) is testable as pure functions with no simulator or network. The native module is a separate Expo module under `modules/` rather than inline in the app so its Swift can be unit-tested and its interface stays explicit. `tools/sidecar-gen/` is the Phase 0 spike generator, retained afterwards to produce golden fixtures — the spike's output becomes a permanent test asset rather than throwaway code.
+
+## Folder-picker Add refinement
+
+**Requirement**: FR-001a and SC-019.
+
+**Files**:
+
+- Modify `src/features/folders/folderPicker.tsx`.
+- Create `tests/component/folderPicker.test.tsx`.
+
+**Interaction flow**:
+
+1. The user navigates from `My Drive` into a normal folder through the existing breadcrumb stack.
+2. The header replaces its right-side spacer with an accessible **Add** `Pressable` when `current.id !== 'root'`.
+3. Selecting **Add** calls the existing `onPick({ id: current.id, name: current.name })` once and resets the picker.
+4. `app/index.tsx` keeps ownership of access validation, persistence, modal closure, error alerts, and navigation.
+
+**State behavior**:
+
+- `My Drive` renders the existing equal-width spacer and no **Add** action.
+- Loading, empty, populated, and listing-error states retain the same body behavior.
+- Empty state copy remains `No subfolders here`.
+- Non-root loading, empty, populated, and listing-error states keep **Add** available.
+- Remove the footer Connect button, root hint, `Button` import, and footer-only styles.
+- Preserve the modal-local `SafeAreaProvider`, breadcrumb behavior, and folder-only Drive query.
+
+**Validation**:
+
+- Component tests mock `listFolders` and `useDrive` and exercise root, child-folder navigation, empty, and error states.
+- Assert **Add** visibility, exact `onPick` payload and call count, retained empty copy, and absence of the footer Connect action.
+- Run `npx jest --selectProjects component tests/component/folderPicker.test.tsx --runInBand`, `npm run typecheck`, and `npm test -- --runInBand`.
 
 ## Complexity Tracking
 

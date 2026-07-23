@@ -22,11 +22,11 @@ description: "Task list for Drive Video Metadata Producer"
 
 ---
 
-## Implementation status (2026-07-23)
+## Implementation status (2026-07-24)
 
-**84 of 89 done. 5 open: all blocked by a missing tool or an unverified integration — none by a decision.**
+**83 of 92 done. Six prior tasks remain blocked by a missing tool or an unverified integration. Three approved folder-picker refinement tasks are ready.**
 
-Phase 8 was added after the first real device session surfaced five defects and one missing affordance. Phase 9 followed with continued use: nested folder navigation, in-app background downloads with notifications, and two schema-touching enrichments (marker notes, whole-video metadata fields). See those phases for what they were and what caused them. Two Phase 9 changes are **PENDING a DaVinci Resolve round-trip** (the marker `comment` mapping and the exact CSV column spellings / Good Take token) — the code is in place and byte-pinned, but which field Resolve reads is confirmed only by an import.
+Phase 8 was added after the first real device session surfaced five defects and one missing affordance. Phase 9 followed with continued use: nested folder navigation, in-app background downloads with notifications, and two schema-touching enrichments (marker notes, whole-video metadata fields). Phase 10 records the approved folder-picker selection refinement from FR-001a and SC-019. Two Phase 9 changes are **PENDING a DaVinci Resolve round-trip** (the marker `comment` mapping and the exact CSV column spellings / Good Take token) — the code is in place and byte-pinned, but which field Resolve reads is confirmed only by an import.
 
 Verified by machine:
 
@@ -246,6 +246,20 @@ Four requests from continued use. Two are implementations (nested navigation, ba
 
 ---
 
+## Phase 10: Folder-picker selection discoverability (2026-07-24)
+
+**Goal**: Let users add a normal non-root Drive folder from its header even when the folder picker renders no child folders.
+
+**Independent Test**: Open a folder containing videos but no subfolders, confirm the picker shows `No subfolders here` and **Add**, select **Add**, and confirm the existing callback receives that folder exactly once.
+
+- [ ] T090 [US1] Add `tests/component/folderPicker.test.tsx` with mocked `listFolders` and `useDrive`. Cover no **Add** at `My Drive`, **Add** after navigating into a child folder, retained **Add** and `No subfolders here` for an empty child listing, retained **Add** on a listing error, exact single `onPick({ id, name })` delivery, and absence of the footer Connect action (FR-001a, SC-019)
+- [ ] T091 [US1] Update `src/features/folders/folderPicker.tsx`: replace the right header spacer with an accessible **Add** `Pressable` for every non-root folder, keep the spacer at `My Drive`, invoke the existing `onPick` and reset flow, remove the footer Connect button and root hint, and preserve folder-only listing, breadcrumbs, empty/error states, and modal safe-area handling (FR-001a)
+- [ ] T092 [US1] Run `npx jest --selectProjects component tests/component/folderPicker.test.tsx --runInBand`, `npm run typecheck`, and `npm test -- --runInBand`; record any unavailable device-only check without changing Drive, OAuth, database, or navigation contracts
+
+**Checkpoint**: A video-only or otherwise childless normal Drive folder is visibly addable without rendering video rows; `My Drive` remains unselectable.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies
@@ -257,6 +271,7 @@ Four requests from continued use. Two are implementations (nested navigation, ba
 - **US3 (Phase 5)**: depends on Foundational. Reuses US1's save pipeline (T042) — build US1 first if working sequentially
 - **US4 (Phase 6)**: depends on Foundational. Independent of US1–US3
 - **Polish (Phase 7)**: depends on the desired stories being complete
+- **Folder-picker refinement (Phase 10)**: depends on the existing T034 picker. Execute T090 → T091 → T092 so the component test fails before the implementation changes and passes afterward
 
 ### Within Phase 2
 
@@ -311,7 +326,7 @@ Task: "T018 Golden-file tests against spike/media/ in tests/golden/"
 
 ### Note on phase sizing
 
-Phase 2 is 25 of 71 tasks. That is honest rather than a smell: this app's product *is* exact frame math and three verified file formats. The screens are thin over that core, which is why US1 is only 11 tasks. Do not compress Phase 2 to make the burndown look better.
+Phase 2 contains 25 tasks. That is honest rather than a smell: this app's product *is* exact frame math and three verified file formats. The screens are thin over that core, which is why the original US1 phase is only 11 tasks. Do not compress Phase 2 to make the burndown look better.
 
 ---
 

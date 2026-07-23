@@ -1,3 +1,7 @@
+---
+description: "Feature specification for Drive Video Metadata Producer"
+---
+
 # Feature Specification: Drive Video Metadata Producer
 
 **Feature Branch**: `001-drive-video-metadata`
@@ -21,6 +25,10 @@
 - Q: How does footage get onto the device before going offline? → A: No pin concept. Opening a video already downloads the full original, and nothing evicts it automatically, so whatever the user has opened is available offline. Cached videos must persist until the user clears them — including across system storage pressure.
 - Q: When do queued saves reach Drive? → A: Automatically on reconnect, with a visible pending count and clear reporting of failures. The checkmark remains the moment of user intent; syncing completes an instruction already given rather than making a new decision.
 
+### Session 2026-07-24
+
+- Q: How does a user select a Drive folder that contains videos but no subfolders when videos are intentionally hidden in the folder picker? → A: Every normal non-root folder shows an **Add** action beside its current-folder name. `My Drive` remains unselectable. The picker stays folder-only and retains `No subfolders here` when no child folders are visible.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Author and save metadata for one video (Priority: P1)
@@ -39,6 +47,7 @@ A solo creator keeps source footage in a Google Drive folder. They connect that 
 4. **Given** a video has unsaved authored metadata, **When** the user taps the checkmark, **Then** `<videofilename>.json`, `<videofilename>.csv`, and `<videofilename>.otio` are written to the same Drive folder as the video, and the user is told the save succeeded.
 5. **Given** a video already has sidecars in Drive, **When** the user saves again, **Then** the existing sidecars are replaced with the current state (last write wins) rather than duplicated.
 6. **Given** a marker was placed at a known frame, **When** the resulting `.otio` is imported into the target editor, **Then** the marker appears at that exact frame with its name, note, and color intact.
+7. **Given** the user opens a normal Drive folder containing videos but no subfolders, **When** the folder picker hides the video files, **Then** it shows `No subfolders here`, keeps **Add** visible beside the current folder name, and connects that folder when **Add** is selected.
 
 ---
 
@@ -122,7 +131,8 @@ The creator works across several shoots, each in its own Drive folder. They swit
 - **Video removed from Drive** while cached locally, or **access to a connected folder revoked**: the app reports the folder or video is unavailable instead of failing silently.
 - **Marker at the last frame, or a range marker extending past the end**: positions must stay within the video's frame count.
 - **Two markers on the same frame**: both are kept and exported.
-- **Folder with no videos, or a very large folder**: the list renders correctly and remains usable.
+- **Picker folder with only videos or no children**: videos remain hidden, `No subfolders here` is shown, and the current non-root folder remains addable from its header.
+- **Folder with no videos, or a very large folder**: the connected-folder list renders correctly and remains usable.
 
 ## Requirements *(mandatory)*
 
@@ -131,6 +141,7 @@ The creator works across several shoots, each in its own Drive folder. They swit
 **Folder connection and library**
 
 - **FR-001**: Users MUST be able to add a Google Drive folder by signing in with their own Google account and selecting the folder.
+- **FR-001a**: The folder-selection interface MUST list folders without rendering videos and MUST show **Add** beside the current normal non-root folder name, including when no child folders are visible or their listing fails. `My Drive` MUST remain unselectable.
 - **FR-002**: System MUST save connected folders to a persistent list that survives app restarts, and let users switch the active folder.
 - **FR-003**: System MUST request the level of Drive access needed to read videos it did not upload and to write files next to them, and MUST explain to the user why that access is needed.
 - **FR-004**: System MUST list the videos in the active folder with a thumbnail for each and an indicator of whether metadata already exists for that video.
@@ -232,12 +243,14 @@ The creator works across several shoots, each in its own Drive folder. They swit
 - **SC-016**: Zero authored values are lost across a full offline cycle: 100% of saves confirmed offline survive app and device restarts and publish intact on reconnect, verified across a test run of many videos annotated with connectivity disabled.
 - **SC-017**: Pending saves publish automatically within seconds of connectivity returning, with no user action, and the pending count reaches zero.
 - **SC-018**: Clearing a folder's video cache while saves are pending destroys zero pending saves — all still publish on reconnect.
+- **SC-019**: A user can add any normal non-root folder from its current-folder header in one action whether it contains subfolders, only videos, no children, or a child-folder listing error; `My Drive` never offers that action.
 
 ## Assumptions
 
 **Scope and users**
 
 - Single user per installation, using their own Google account. No teams, sharing, collaboration, or permission model beyond what Drive itself enforces.
+- Folder selection supports normal folders under `My Drive` only. Adding the `My Drive` root, Shared Drive folders, and folder shortcuts is out of scope.
 - The app is for personal use. Publishing to a store — and the Google review that a broad Drive access scope would trigger — is out of scope for this version.
 - All metadata is authored by hand. No automatic generation (speech-to-text, shot detection, object detection) in this version.
 - Out of scope for this version: proxy or lower-quality downloads, on-device transcoding, FCPXML export, and Android.
