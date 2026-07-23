@@ -94,7 +94,7 @@ describe('marker editing sheet', () => {
     await fireEvent.press(view.getByLabelText('Edit marker 120'));
 
     await fireEvent.changeText(view.getByPlaceholderText('What is this?'), 'wide shot');
-    await fireEvent.press(view.getByText('Done'));
+    await fireEvent.press(view.getByRole('button', { name: 'Done' }));
 
     expect(seen[seen.length - 1]?.[0]?.name).toBe('wide shot');
     // The row previously kept its "Frame 120" fallback, because it had no name.
@@ -116,7 +116,7 @@ describe('marker editing sheet', () => {
     // publishing it would turn a half-typed number into a one-frame range.
     expect(seen[seen.length - 1]?.[0]?.durationFrames).toBe(0);
 
-    await fireEvent.press(view.getByText('Done'));
+    await fireEvent.press(view.getByRole('button', { name: 'Done' }));
     expect(seen[seen.length - 1]?.[0]?.durationFrames).toBe(120);
   });
 
@@ -131,7 +131,7 @@ describe('marker editing sheet', () => {
     await fireEvent.press(view.getByLabelText('Edit marker 120'));
 
     await fireEvent.changeText(view.getByPlaceholderText('0'), '2.5');
-    await fireEvent.press(view.getByText('Done'));
+    await fireEvent.press(view.getByRole('button', { name: 'Done' }));
 
     // Principle I: 2.5 frames is not a thing, and 2 or 3 would be a guess.
     expect(seen[seen.length - 1]?.[0]?.durationFrames).toBe(48);
@@ -149,7 +149,7 @@ describe('marker editing sheet', () => {
 
     await fireEvent.press(view.getByLabelText('Edit marker first'));
     expect(view.getByPlaceholderText('What is this?').props.value).toBe('first');
-    await fireEvent.press(view.getByText('Done'));
+    await fireEvent.press(view.getByRole('button', { name: 'Done' }));
 
     await fireEvent.press(view.getByLabelText('Edit marker second'));
     expect(view.getByPlaceholderText('What is this?').props.value).toBe('second');

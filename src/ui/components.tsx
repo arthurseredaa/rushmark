@@ -1,14 +1,52 @@
 import * as React from 'react';
 import {
   ActivityIndicator,
+  InputAccessoryView,
+  Keyboard,
   Pressable,
   StyleSheet,
   Text,
+  TextInput,
+  type TextInputProps,
   View,
   type ViewStyle,
 } from 'react-native';
 
 import { spacing, theme } from './theme';
+
+/**
+ * A `TextInput` that carries its own "Done" bar above the iOS keyboard.
+ *
+ * Drop-in for `TextInput`. Each instance mints a unique `nativeID` and renders
+ * its **own** `InputAccessoryView`, because an accessory view binds to a single
+ * TextInput — sharing one id across fields makes it appear on only the first
+ * one to claim it (which is why an earlier shared bar showed on Comments alone).
+ * The number-pad duration field has no Return key, so this bar is its only way
+ * out of the keyboard.
+ */
+export const DoneInput = React.forwardRef<TextInput, TextInputProps>(
+  function DoneInput(props, ref): React.ReactElement {
+    const id = React.useId();
+    return (
+      <>
+        <TextInput ref={ref} inputAccessoryViewID={id} {...props} />
+        <InputAccessoryView nativeID={id}>
+          <View style={styles.kbBar}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss keyboard"
+              onPress={() => Keyboard.dismiss()}
+              hitSlop={8}
+              style={({ pressed }) => [styles.kbDone, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.kbDoneLabel}>Done</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      </>
+    );
+  },
+);
 
 export function Button({
   label,
@@ -108,6 +146,17 @@ export function Badge({
 }
 
 const styles = StyleSheet.create({
+  kbBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    backgroundColor: theme.surfaceRaised,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+  },
+  kbDone: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+  kbDoneLabel: { color: theme.accent, fontSize: 16, fontWeight: '600' },
   button: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,

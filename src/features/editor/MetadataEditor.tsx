@@ -3,8 +3,9 @@
  */
 
 import * as React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { DoneInput } from '@/ui/components';
 import { spacing, theme } from '@/ui/theme';
 
 export function MetadataEditor({
@@ -48,7 +49,7 @@ export function MetadataEditor({
       </View>
 
       <Text style={styles.label}>Comments</Text>
-      <TextInput
+      <DoneInput
         style={styles.comments}
         value={comments}
         onChangeText={onCommentsChange}
@@ -59,7 +60,7 @@ export function MetadataEditor({
       />
 
       <Text style={styles.label}>Description</Text>
-      <TextInput
+      <DoneInput
         style={styles.comments}
         value={description}
         onChangeText={onDescriptionChange}
@@ -145,7 +146,7 @@ function TagField({
         ))}
       </View>
       <View style={styles.keywordEntry}>
-        <TextInput
+        <DoneInput
           style={styles.keywordInput}
           value={draft}
           onChangeText={setDraft}

@@ -4,19 +4,19 @@
 
 import * as React from 'react';
 import {
+  KeyboardAvoidingView,
   Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 
 import { PALETTE, type Marker, type MarkerColor } from '@/domain/canonical';
 import type { Rational } from '@/domain/rational';
 import { framesToTimecode } from '@/domain/timecode';
-import { Button, Empty } from '@/ui/components';
+import { Button, DoneInput, Empty } from '@/ui/components';
 import { MARKER_SWATCH, spacing, theme } from '@/ui/theme';
 
 export function MarkerList({
@@ -172,15 +172,18 @@ function MarkerSheet({
   return (
     <Modal visible transparent animationType="slide" onRequestClose={close}>
       <Pressable style={styles.backdrop} onPress={close} />
-      <View style={styles.sheet}>
-        <ScrollView contentContainerStyle={styles.sheetBody}>
+      <KeyboardAvoidingView behavior="padding" style={styles.sheet}>
+        <ScrollView
+          contentContainerStyle={styles.sheetBody}
+          keyboardShouldPersistTaps="handled"
+        >
           <Text style={styles.sheetTitle}>
             Marker at {framesToTimecode((sourceTimecodeFrames ?? 0) + marker.frame, rate)}
           </Text>
           <Text style={styles.sheetSub}>Frame {marker.frame} of the source</Text>
 
           <Text style={styles.label}>Name</Text>
-          <TextInput
+          <DoneInput
             style={styles.input}
             value={name}
             onChangeText={(v) => {
@@ -192,7 +195,7 @@ function MarkerSheet({
           />
 
           <Text style={styles.label}>Note</Text>
-          <TextInput
+          <DoneInput
             style={[styles.input, styles.note]}
             value={note}
             onChangeText={(v) => {
@@ -206,7 +209,7 @@ function MarkerSheet({
           />
 
           <Text style={styles.label}>Duration (frames) — 0 for a point marker</Text>
-          <TextInput
+          <DoneInput
             style={styles.input}
             value={duration}
             onChangeText={setDuration}
@@ -240,7 +243,7 @@ function MarkerSheet({
             <Button label="Delete marker" variant="danger" onPress={() => onDelete(marker.id)} />
           </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

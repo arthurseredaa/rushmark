@@ -6,6 +6,7 @@
 import { Stack, useLocalSearchParams } from 'expo-router';
 import * as React from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   FramePlayer,
@@ -55,6 +56,7 @@ function Screen(): React.ReactElement {
   const db = useDatabase();
   const drive = useDrive();
   const { online } = useConnectivity();
+  const insets = useSafeAreaInsets();
 
   const [video, setVideo] = React.useState<VideoRow | null>(null);
   const [open, setOpen] = React.useState<OpenState | null>(null);
@@ -477,20 +479,25 @@ function Screen(): React.ReactElement {
 
       {player && probe ? (
         <View style={styles.transport}>
-          {streaming ? null : (
-            <Text style={styles.timecode}>{framesToTimecode(tcBase + frame, rate)}</Text>
-          )}
-
           <Scrubber
             frame={frame}
             durationFrames={probe.durationFrames}
             onScrub={handleScrub}
             onCommit={handleCommit}
           />
-          <View style={styles.clockRow}>
-            <Text style={styles.clock}>{framesToClock(frame, rate)}</Text>
+
+          {/* One compact status line replaces the old stacked timecode + clocks
+              + frame label, so the pinned transport eats far less height. */}
+          <View style={styles.statusRow}>
+            <Text style={styles.status} numberOfLines={1}>
+              {streaming
+                ? 'Streaming preview — not downloaded'
+                : `TC ${framesToTimecode(tcBase + frame, rate)} · Frame ${frame}/${
+                    probe.durationFrames - 1
+                  }`}
+            </Text>
             <Text style={styles.clock}>
-              {framesToClock(Math.max(0, probe.durationFrames - 1), rate)}
+              {framesToClock(frame, rate)} / {framesToClock(Math.max(0, probe.durationFrames - 1), rate)}
             </Text>
           </View>
 
@@ -516,36 +523,35 @@ function Screen(): React.ReactElement {
               </>
             )}
           </View>
-          {streaming ? (
-            <Text style={styles.frameLabel}>Streaming preview — not downloaded</Text>
-          ) : (
-            <Text style={styles.frameLabel}>
-              Frame {frame} of {probe.durationFrames - 1}
-            </Text>
-          )}
+
+          {streaming && open?.kind === 'needs-download' ? (
+            <View style={styles.streamBar}>
+              <Text style={styles.streamBarText} numberOfLines={1}>
+                {progress !== null
+                  ? `Downloading… ${Math.round(progress * 100)}%`
+                  : `Download ${formatBytes(open.sizeBytes)} to step frames and mark up.`}
+              </Text>
+              {progress !== null ? (
+                <Button
+                  label="Cancel"
+                  variant="secondary"
+                  onPress={() => void downloads.cancel(video.id)}
+                />
+              ) : (
+                <Button label="Download" variant="secondary" onPress={beginDownload} />
+              )}
+            </View>
+          ) : null}
         </View>
       ) : null}
 
-      {streaming && open?.kind === 'needs-download' ? (
-        <View style={styles.streamBar}>
-          <Text style={styles.streamBarText} numberOfLines={2}>
-            {progress !== null
-              ? `Downloading… ${Math.round(progress * 100)}% — you can keep browsing.`
-              : `Download ${formatBytes(open.sizeBytes)} to step frames and place markers.`}
-          </Text>
-          {progress !== null ? (
-            <Button
-              label="Cancel"
-              variant="secondary"
-              onPress={() => void downloads.cancel(video.id)}
-            />
-          ) : (
-            <Button label="Download" variant="secondary" onPress={beginDownload} />
-          )}
-        </View>
-      ) : null}
-
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={styles.bodyScroll}
+        contentContainerStyle={[styles.body, { paddingBottom: spacing.xl + insets.bottom }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
+      >
         {loaded?.warnings.length ? (
           <Banner
             tone="warning"
@@ -685,55 +691,49 @@ const styles = StyleSheet.create({
   placeholderText: { color: theme.textDim, fontSize: 14, textAlign: 'center' },
   transport: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
     alignItems: 'stretch',
     gap: spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: theme.border,
   },
-  timecode: {
-    color: theme.text,
-    fontSize: 22,
-    fontWeight: '600',
-    textAlign: 'center',
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  status: {
+    flex: 1,
+    color: theme.textDim,
+    fontSize: 13,
     fontVariant: ['tabular-nums'],
   },
-  clockRow: { flexDirection: 'row', justifyContent: 'space-between' },
   clock: { color: theme.textDim, fontSize: 12, fontVariant: ['tabular-nums'] },
   transportButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
     gap: spacing.sm,
-    marginTop: spacing.sm,
   },
   transportButton: {
     backgroundColor: theme.surfaceRaised,
     borderRadius: 8,
-    paddingVertical: spacing.sm,
-    minWidth: 52,
+    paddingVertical: spacing.xs,
+    minWidth: 44,
     alignItems: 'center',
   },
-  transportButtonWide: { minWidth: 72, backgroundColor: theme.accent },
+  transportButtonWide: { minWidth: 64, backgroundColor: theme.accent },
   transportPressed: { opacity: 0.6 },
   transportLabel: { color: theme.text, fontSize: 15, fontWeight: '600' },
-  frameLabel: {
-    color: theme.textDim,
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: spacing.xs,
-    fontVariant: ['tabular-nums'],
-  },
   streamBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.border,
+    marginTop: spacing.xs,
   },
   streamBarText: { flex: 1, color: theme.textDim, fontSize: 12, lineHeight: 16 },
-  body: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
+  bodyScroll: { flex: 1 },
+  body: { padding: spacing.lg },
   sectionTitle: { color: theme.text, fontSize: 17, fontWeight: '700' },
   markerHeader: {
     flexDirection: 'row',
