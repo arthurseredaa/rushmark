@@ -36,7 +36,18 @@ export function MarkerList({
   onChange: (id: string, patch: Partial<Omit<Marker, 'id'>>) => void;
   onDelete: (id: string) => void;
 }): React.ReactElement {
-  const [editing, setEditing] = React.useState<Marker | null>(null);
+  /**
+   * The ID, not the marker.
+   *
+   * Holding the object froze a copy taken at the moment of the tap: every edit
+   * went to the parent, the parent produced a new marker, and the sheet went on
+   * rendering the stale one. A controlled TextInput whose `value` never changes
+   * rejects almost everything typed into it — which is exactly what it looked
+   * like. Deriving from `markers` means the sheet always sees the live marker,
+   * and it also disappears correctly if the marker is removed underneath it.
+   */
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const editing = markers.find((m) => m.id === editingId) ?? null;
 
   if (markers.length === 0) {
     return (
@@ -55,7 +66,7 @@ export function MarkerList({
           accessibilityRole="button"
           style={[styles.row, currentFrame === m.frame && styles.rowCurrent]}
           onPress={() => onSeek(m.frame)}
-          onLongPress={() => setEditing(m)}
+          onLongPress={() => setEditingId(m.id)}
         >
           <View style={[styles.swatch, { backgroundColor: MARKER_SWATCH[m.color] }]} />
           <View style={styles.rowMain}>
@@ -73,7 +84,7 @@ export function MarkerList({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`Edit marker ${m.name || m.frame}`}
-            onPress={() => setEditing(m)}
+            onPress={() => setEditingId(m.id)}
             hitSlop={8}
           >
             <Text style={styles.edit}>Edit</Text>
@@ -81,17 +92,23 @@ export function MarkerList({
         </Pressable>
       ))}
 
-      <MarkerSheet
-        marker={editing}
-        rate={rate}
-        sourceTimecodeFrames={sourceTimecodeFrames}
-        onClose={() => setEditing(null)}
-        onChange={onChange}
-        onDelete={(id) => {
-          setEditing(null);
-          onDelete(id);
-        }}
-      />
+      {editing ? (
+        // Keyed by marker id so opening a different marker remounts the sheet
+        // and re-seeds its drafts. Without the key the drafts would carry over
+        // from whichever marker was edited last.
+        <MarkerSheet
+          key={editing.id}
+          marker={editing}
+          rate={rate}
+          sourceTimecodeFrames={sourceTimecodeFrames}
+          onClose={() => setEditingId(null)}
+          onChange={onChange}
+          onDelete={(id) => {
+            setEditingId(null);
+            onDelete(id);
+          }}
+        />
+      ) : null}
     </View>
   );
 }
@@ -104,20 +121,30 @@ function MarkerSheet({
   onChange,
   onDelete,
 }: {
-  marker: Marker | null;
+  marker: Marker;
   rate: Rational;
   sourceTimecodeFrames: number | null;
   onClose: () => void;
   onChange: (id: string, patch: Partial<Omit<Marker, 'id'>>) => void;
   onDelete: (id: string) => void;
-}): React.ReactElement | null {
-  const [duration, setDuration] = React.useState('');
-
-  React.useEffect(() => {
-    setDuration(marker ? String(marker.durationFrames ?? 0) : '');
-  }, [marker]);
-
-  if (!marker) return null;
+}): React.ReactElement {
+  /**
+   * The text fields render from local drafts, not from the marker.
+   *
+   * Every keystroke still reaches the parent immediately — Principle II, nothing
+   * typed is held hostage until some later commit. But what the field *displays*
+   * must not depend on a round trip through the whole video screen, which now
+   * re-renders ten times a second from the playhead observer. Feeding a
+   * controlled input from that far away is how characters get eaten.
+   *
+   * Seeded lazily and never re-seeded: the parent keys this component by marker
+   * id, so a different marker is a different mount.
+   */
+  const [name, setName] = React.useState(() => marker.name ?? '');
+  const [note, setNote] = React.useState(() => marker.note ?? '');
+  const [duration, setDuration] = React.useState(() =>
+    String(marker.durationFrames ?? 0),
+  );
 
   const commitDuration = (): void => {
     const trimmed = duration.trim();
@@ -131,9 +158,20 @@ function MarkerSheet({
     onChange(marker.id, { durationFrames: parsed });
   };
 
+  /**
+   * Duration is the one field that cannot publish per keystroke — "1" on the way
+   * to "120" is a valid number and would be applied. So it commits on the way
+   * out, and every exit goes through here: Done, the backdrop, and the hardware
+   * back gesture. Dismissing must not be a way to lose a typed value.
+   */
+  const close = (): void => {
+    commitDuration();
+    onClose();
+  };
+
   return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} />
+    <Modal visible transparent animationType="slide" onRequestClose={close}>
+      <Pressable style={styles.backdrop} onPress={close} />
       <View style={styles.sheet}>
         <ScrollView contentContainerStyle={styles.sheetBody}>
           <Text style={styles.sheetTitle}>
@@ -144,8 +182,11 @@ function MarkerSheet({
           <Text style={styles.label}>Name</Text>
           <TextInput
             style={styles.input}
-            value={marker.name ?? ''}
-            onChangeText={(v) => onChange(marker.id, { name: v })}
+            value={name}
+            onChangeText={(v) => {
+              setName(v);
+              onChange(marker.id, { name: v });
+            }}
             placeholder="What is this?"
             placeholderTextColor={theme.textDim}
           />
@@ -153,8 +194,11 @@ function MarkerSheet({
           <Text style={styles.label}>Note</Text>
           <TextInput
             style={[styles.input, styles.note]}
-            value={marker.note ?? ''}
-            onChangeText={(v) => onChange(marker.id, { note: v })}
+            value={note}
+            onChangeText={(v) => {
+              setNote(v);
+              onChange(marker.id, { note: v });
+            }}
             placeholder="Anything worth remembering here"
             placeholderTextColor={theme.textDim}
             multiline
@@ -192,7 +236,7 @@ function MarkerSheet({
           </View>
 
           <View style={styles.sheetActions}>
-            <Button label="Done" onPress={onClose} />
+            <Button label="Done" onPress={close} />
             <Button label="Delete marker" variant="danger" onPress={() => onDelete(marker.id)} />
           </View>
         </ScrollView>
