@@ -106,7 +106,10 @@ The source-of-truth record. What the user edits against; published as `.json`.
 | `videoId` | TEXT PK FK | → Video |
 | `comments` | TEXT | free text (FR-013), default `''` |
 | `keywords` | JSON | `string[]` (FR-014), default `[]` |
-| `schemaVersion` | INTEGER | as read; diagnostic only (FR-023a, D11) |
+| `description` | TEXT | free text, distinct from comments (FR-014a, schema v2), default `''` |
+| `people` | JSON | `string[]` (FR-014a, schema v2), default `[]` |
+| `goodTake` | INTEGER | 0/1 Good Take flag (FR-014a, schema v2), default `0` |
+| `schemaVersion` | INTEGER | as read; diagnostic only (FR-023a, D11). Written as **2** |
 | `unknownFields` | JSON | **verbatim unrecognized fields (FR-023b)** |
 | `provenance` | TEXT | `'manual'` — all v1 authoring (FR-018) |
 | `dirty` | INTEGER | 1 = unsaved changes (FR-029) |
@@ -205,6 +208,9 @@ CREATE TABLE video_metadata (
   videoId TEXT PRIMARY KEY REFERENCES videos(id) ON DELETE CASCADE,
   comments TEXT NOT NULL DEFAULT '',
   keywords TEXT NOT NULL DEFAULT '[]',
+  description TEXT NOT NULL DEFAULT '',   -- schema v2 (migration ladder v2)
+  people TEXT NOT NULL DEFAULT '[]',      -- schema v2
+  goodTake INTEGER NOT NULL DEFAULT 0,    -- schema v2
   schemaVersion INTEGER NOT NULL DEFAULT 1,
   unknownFields TEXT NOT NULL DEFAULT '{}',   -- FR-023b
   provenance TEXT NOT NULL DEFAULT 'manual',

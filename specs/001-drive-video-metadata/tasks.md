@@ -22,27 +22,29 @@ description: "Task list for Drive Video Metadata Producer"
 
 ---
 
-## Implementation status (2026-07-17)
+## Implementation status (2026-07-23)
 
-**64 of 71 done. 7 blocked, none by a decision — all by a missing tool.**
+**84 of 89 done. 5 open: all blocked by a missing tool or an unverified integration — none by a decision.**
+
+Phase 8 was added after the first real device session surfaced five defects and one missing affordance. Phase 9 followed with continued use: nested folder navigation, in-app background downloads with notifications, and two schema-touching enrichments (marker notes, whole-video metadata fields). See those phases for what they were and what caused them. Two Phase 9 changes are **PENDING a DaVinci Resolve round-trip** (the marker `comment` mapping and the exact CSV column spellings / Good Take token) — the code is in place and byte-pinned, but which field Resolve reads is confirmed only by an import.
 
 Verified by machine:
 
 | | |
 |---|---|
-| `npx jest` | **130 passing** across 6 suites |
+| `npx jest` | **138 passing** across 7 suites, in two projects |
 | `npx tsc --noEmit` | clean |
 | `npx eslint .` | clean |
+| `npm run test:native` | **passing** — real MediaProbe against the real spike clip |
 
 The golden suite reproduces all three spike-verified sidecars **byte-for-byte** from the TypeScript port, so F13's timecode offset, F7's absent BOM, and D13a's TC columns are now regression-locked rather than remembered.
 
-**Blocked, needing Xcode** (not installed here — Command Line Tools only, no CocoaPods):
+**Native build (resolved 2026-07-21):** Xcode is installed, `expo prebuild -p ios` and `expo run:ios` succeed, and the app runs on device with Google sign-in working. **T008 is done.** The Swift in `modules/frame-player/ios/` has now been through a compiler and through real footage.
 
-- **T008** — `expo prebuild` + dev-client device build
-- **T024** [CONST] — Swift XCTest frame-math suite. Written, never run. The TypeScript equivalent (T017) passes at all eight rates, but the Swift side does its own arithmetic and is unverified
+**Still blocked, needing a runnable test target:**
+
+- **T024** [CONST] — Swift XCTest frame-math suite. Written, never run. Not an Xcode problem: CocoaPods' `test_spec` generates a scheme whose `<Testables>` list is empty, so there is no test target to run. The TypeScript equivalent (T017) passes at all eight rates, but the Swift side does its own arithmetic and is still unverified
 - **T070** — quickstart validation on device
-
-The whole of `modules/frame-player/ios/*.swift` has never been through a compiler. Assume it needs fixing, not that it works.
 
 **Blocked, needing DaVinci Resolve + real footage** (the constitution's "verify against the real tool" clause — these are exactly the questions the spike left open, and guessing at them is what cost hours last time):
 
@@ -73,7 +75,7 @@ Single Expo app at repository root per plan.md: `app/` (expo-router screens), `s
 - [X] T005 [P] Configure Jest with `jest-expo` preset and `@testing-library/react-native` in `jest.config.js`, with `tests/unit`, `tests/golden`, `tests/integration` roots
 - [X] T006 Configure `app.json`: iOS bundle identifier, deployment target 16.0, `expo-router` plugin, `expo-dev-client` plugin, and the Google Sign-In plugin with `iosUrlScheme`
 - [X] T007 [P] Create `.env.example` documenting `GOOGLE_IOS_CLIENT_ID` and `GOOGLE_WEB_CLIENT_ID`, and read them in `app.config.ts` (`.env` is already git-ignored)
-- [~] T008 Scaffold the native module at `modules/frame-player/` via `npx create-expo-module@latest --local frame-player`, then `npx expo prebuild -p ios` and verify a dev-client build runs on a physical device — **BLOCKED: Xcode not installed** (only Command Line Tools; no CocoaPods). Module source is written; `prebuild` and the device build cannot run here
+- [X] T008 Scaffold the native module at `modules/frame-player/` via `npx create-expo-module@latest --local frame-player`, then `npx expo prebuild -p ios` and verify a dev-client build runs on a physical device. Done 2026-07-21; setup, including the OAuth credentials the build needs, is written up in `SETUP.md`
 
 **Checkpoint**: `npx expo run:ios` launches a dev client on device with an empty screen and a linked (stub) native module. ⚠️ Not reached — requires Xcode.
 
@@ -209,6 +211,38 @@ Single Expo app at repository root per plan.md: `app/` (expo-router screens), `s
 - [~] T069 [P] Exclude `Documents/` cached video from iCloud backup in `src/data/cache/videoCache.ts` and confirm the files survive simulated storage pressure (FR-010)
 - [~] T070 Run the full quickstart.md validation on device against real Drive footage, including a Resolve import of the app's own output
 - [X] T071 [P] Update `spike/README.md` and `specs/001-drive-video-metadata/research.md` to close out the open items resolved by T065–T067
+
+---
+
+## Phase 8: Defects found on device (2026-07-22)
+
+Problems from the first real sessions with real footage. Most were defects; T074 and T077–T080 are capabilities the spec had ruled out, or never thought to ask for, and that did not survive contact with an actual clip.
+
+- [X] T072 Mount a `SafeAreaProvider` at the root in `app/_layout.tsx`, and a second one inside the `Modal` in `src/features/folders/folderPicker.tsx`. Without the first, every inset read zero; without the second, the modal's own window is invisible to the root provider. Either way the picker's Cancel button sat under the status bar clock
+- [X] T073 [CONST] Fix variable-rate misdetection in `modules/frame-player/ios/MediaProbe.swift`. `detectRateMode` differenced consecutive presentation timestamps taken from an `AVAssetReader`, which hands back **decode order** — so any H.264/HEVC stream with B-frames has PTS that move backwards and forwards and every ordinary camera file was classified `variable`. Markers were therefore withheld from every downloaded clip. Now reads per-sample durations, which are order-independent, falling back to *sorted* PTS deltas where the container leaves duration unset
+- [X] T074 Stream preview without downloading (FR-006c, FR-006d). Adds `loadRemote` to `modules/frame-player/ios/FramePlayerModule.swift` (an `AVURLAsset` carrying the Drive bearer token in `AVURLAssetHTTPHeaderFieldsKey`), a shallow `MediaProbe.probe(asset:deep:)`, `FramePlayer.loadRemote` in the JS bridge, `streamSource` in `src/features/library/openVideo.ts`, and stream/file source selection in `app/video/[videoId].tsx`. Opening a video no longer downloads it. A streamed handle offers play/pause only and reports its rate as unconfirmed, so the marker gate stays shut until the file is on disk — which is Principle I drawing the line, not a UI preference
+- [X] T075 Make keyword entry's commit step visible in `src/features/editor/MetadataEditor.tsx`. Only Return or a blur committed the draft, so typing a keyword and going straight to ✓ silently dropped it — a Principle II violation in miniature. Adds an explicit Add button and a hint naming both shortcuts and when keywords reach Drive
+- [X] T077 [CONST] Add `framesToClock` to `src/domain/timecode.ts` — elapsed wall-clock, distinct from timecode, exact via `frames * den / num` in integer arithmetic. Timecode counts *labelled* frames, so reusing it as a clock reads ~0.1% fast at 24000/1001 and is a full second off after 1000 s. Covered by three cases in `tests/unit/timecode.test.ts`
+- [X] T078 Emit playback position from `modules/frame-player/ios/FramePlayerModule.swift`. `onFrameChanged` was declared in the module definition from the start and never fired, which is why nothing on screen moved during playback. Adds a periodic time observer at 10 Hz, capturing the rate as plain integers so the closure cannot retain the handle that owns it
+- [X] T079 Add `scrubToFrame` (half-second tolerance) alongside the zero-tolerance `seekToFrame`, in the Swift module and the JS bridge. Zero tolerance forces a decode from the previous keyframe on every move event — fine for a considered seek, unusable under a finger. Documented as approximate at every layer, and never a marker position
+- [X] T080 Build the timeline in `src/features/editor/Scrubber.tsx` (FR-007a) and wire it into `app/video/[videoId].tsx` with elapsed/total running time. The touch fraction becomes an integer frame on the line that reads it and nothing fractional escapes; drags scrub approximately and commit through an exact `seekToFrame` on a downloaded copy, so the frame the user lands on is one they can mark
+- [X] T081 Fix marker editing in `src/features/editor/MarkerList.tsx`. `MarkerList` held the marker **object** in state, so the sheet rendered a copy frozen at the tap: every keystroke updated the parent, the parent produced a new marker, and the sheet kept showing the old one. A controlled `TextInput` whose `value` never advances rejects what is typed into it, so a name typed as "wide shot" arrived as "w" — and the row then showed that wrong value. Now holds `editingId` and derives the live marker from `markers`; the sheet is keyed by id so a different marker is a different mount
+- [X] T082 Decouple the sheet's text fields from the screen's render cycle. They draft locally and publish every keystroke upward, so nothing typed is held hostage (Principle II) but no field is fed by a value that has to travel through a screen now re-rendering ten times a second from the playhead observer (T078). Duration is the exception: it commits on exit, since "1" en route to "120" is a valid integer that must not be applied — and every exit, including the backdrop, goes through that commit
+- [X] T083 [P] First test in the `component` jest project (`tests/component/markerSheet.test.tsx`), which existed for exactly this case and had never been used. Five cases; the load-bearing one types character by character and **fails against the pre-fix code**, verified by reverting. A single `changeText` with the whole string passes either way — the first keystroke was never what broke
+- [X] T084 [CONST] Fix source-timecode reading in `modules/frame-player/ios/MediaProbe.swift`. The timecode track interleaves **empty marker sample buffers** (`numSamples == 0`, no data buffer) with the one real sample; on the verified DJI clip the first buffer is empty and the timecode sits in the second. The code read one buffer, found nothing, and returned nil — so `tcBase` fell to 0, every OTIO declared its ranges at frame 0, and Resolve reported **"The clip was not found"** (spike F13: the modal blames the path for a timecode fault). The same absence stripped the `Start TC`/`End TC` columns from the CSV, which Resolve's Metadata Import matches on by default (D13a). **One missed sample buffer disabled the entire Resolve integration, in both directions.** Now scans up to 16 buffers for one carrying data, and assembles the big-endian frame counter byte by byte instead of rebinding possibly-unaligned sample memory to `Int32`/`Int64`
+- [X] T085 [CONST] Add a runnable native check — `modules/frame-player/ios/Tests/ProbeCheck.swift` plus `scripts/check-native-probe.sh`, wired up as `npm run test:native`. Asserts the real `MediaProbe.probe()` against the real spike clip and the four values Resolve accepted (24000/1001, 247 frames, `constant`, TC 1631008). Deliberately bypasses Xcode: `MediaProbe.swift` imports only AVFoundation and CoreMedia, so `swiftc` builds it directly — which is why this runs today while **T024's XCTest target has been blocked for weeks** on CocoaPods emitting a scheme with no testables. Verified to fail against the pre-fix code by reverting. Skips cleanly when the gitignored fixture is absent. **T024 remains open for the frame↔CMTime arithmetic in `FramePlayerModule.swift`, which is still unrun**
+- [X] T076 Fix the folder screen's layout in `app/folder/[folderId].tsx`. Root cause: the two horizontal chip `ScrollView`s had no height constraint, so each ballooned vertically and pushed the list far down. Fixed by pinning both bars with `flexGrow: 0`, giving the `FlatList` `flex: 1`, and labelling the keyword row `Filter` (it was unlabelled and read as a mystery row). Layout-only; confirmed working on device 2026-07-23
+
+---
+
+## Phase 9: Navigation, background downloads, richer metadata (2026-07-23)
+
+Four requests from continued use. Two are implementations (nested navigation, background downloads); two began as "research if we can" and, once answered, became changes — the marker note and the whole-video fields.
+
+- [X] T086 Nested folder navigation (FR-004a) in `app/folder/[folderId].tsx`, using the existing `listFolders` in `src/data/drive/files.ts`. Subfolders now appear as navigable rows in the list header and descend by pushing the same route with the name carried as a param (so the title is right before Drive answers). Videos are persisted per-folder as before, so a browsed subfolder's videos stay offline-available; the empty-state copy that claimed the app "does not look in subfolders" is gone. **Known limit:** subfolder *listings* are fetched live, so descending into a not-yet-visited subfolder needs a connection
+- [X] T087 [CONST] Marker note via the OTIO-native `comment` field (FR-031) in `src/domain/projections/otio.ts`. `Marker.2` has a first-class `comment`; the note had been buried in `metadata`, the app-namespaced sub-dict adapters do not read — which is why marker notes never surfaced in Resolve. The dead `noteInName` fallback (old T065 experiment) is removed. Golden fixture `spike/media/*.otio` regenerated; a new golden assertion pins the note into `comment` with empty `metadata`. **PENDING a Resolve round-trip** to confirm the field lands — the non-marker bytes are unchanged and still Resolve-confirmed
+- [X] T088 Schema-v2 whole-video fields — Description, People, Good Take (FR-014a). Touches `src/domain/canonical.ts` (`SCHEMA_VERSION = 2`, authored fields + parse), `src/domain/unknownFields.ts` (KNOWN so old-build preservation does not double-store them), `src/domain/projections/csv.ts` (populated-only columns, keeping the common CSV byte-stable), `src/data/db/schema.ts` (append-only migration v2: three `ALTER TABLE`s), `src/data/db/repositories.ts`, `src/features/editor/loadVideo.ts` + `saveVideo.ts`, `src/features/editor/MetadataEditor.tsx` (Description field, a shared comma-tolerant `TagField` for Keywords and People, a Good Take toggle), and `app/video/[videoId].tsx`. Golden `.json` fixture bumped to v2; new `schema v2 authored fields` golden block. **PENDING a Resolve round-trip** for the exact CSV column spellings and the Good Take token
+- [X] T089 In-app background downloads with completion notifications (FR-006e). New `src/features/downloads/downloadManager.ts` — a React-free, expo-free state machine (both the downloader and notifier injected) so it is unit-tested under node (`tests/unit/downloadManager.test.ts`, 8 cases: survives navigation, notifies once on success, never on a real failure, a cancel is removal not failure, idempotent while in flight). `src/data/notifications.ts` wraps expo-notifications (foreground banner handler, permission, tap→route). `src/ui/DownloadHost.tsx` mounts the manager at the root next to `SyncEngineHost`; the video screen hands off to it and reacts to completion; the folder list shows a live `↓ %` badge. Adds `expo-notifications` (dep + config plugin). **Scope decision (2026-07-23): in-app background — runs while the app is alive; a full quit stops it. Requires `npx expo install` (done) and a native rebuild**
 
 ---
 

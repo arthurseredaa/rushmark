@@ -134,15 +134,20 @@ The creator works across several shoots, each in its own Drive folder. They swit
 - **FR-002**: System MUST save connected folders to a persistent list that survives app restarts, and let users switch the active folder.
 - **FR-003**: System MUST request the level of Drive access needed to read videos it did not upload and to write files next to them, and MUST explain to the user why that access is needed.
 - **FR-004**: System MUST list the videos in the active folder with a thumbnail for each and an indicator of whether metadata already exists for that video.
+- **FR-004a**: System MUST let the user descend into the subfolders of a connected folder and browse their videos, navigating the folder tree freely. Only video files are listed as playable items; subfolders appear as navigable entries. Subfolder listings are fetched live and so require a network connection; videos already browsed remain available offline.
 - **FR-005**: Users MUST be able to filter and sort the active folder's video list by keyword.
 
 **Preview**
 
-- **FR-006**: System MUST download a video's original file to a local cache when the user opens it, and report clearly if the download does not complete.
-- **FR-006a**: System MUST start the download without prompting when the device is on Wi-Fi. On a cellular connection it MUST show the file's size and ask the user to confirm before starting.
+- **FR-006**: System MUST be able to download a video's original file to a local cache, on the user's request, and report clearly if the download does not complete. It MUST NOT begin a download merely because the user opened the video.
+- **FR-006a**: System MUST show the file's size before any download starts, and on a cellular connection MUST ask the user to confirm before starting.
 - **FR-006b**: System MUST show download progress and let the user cancel a download in flight, leaving no partial file treated as playable.
+- **FR-006c**: System MUST play a video that has not been downloaded by streaming it from Drive, so that watching a clip and writing comments and keywords for it never requires waiting for a full-size download. A streamed preview MUST offer play and pause only; frame stepping, frame-exact scrubbing, and marker placement remain reserved for a downloaded copy, and the interface MUST say so rather than silently omitting them.
+- **FR-006d**: System MUST NOT treat the technical facts read from a stream as the video's technical record. A streamed read MUST report its frame rate as unconfirmed and MUST NOT overwrite facts previously established from a downloaded copy.
+- **FR-006e**: System MUST let a download run in the background — continuing while the user browses or edits elsewhere in the app rather than waiting on the video screen — and MUST notify the user when it finishes so they can return to place markers. Downloads run while the app is active; a full quit stops them (true OS-background transfer is out of scope for this version).
 - **FR-007**: System MUST play the cached video with frame-accurate positioning, including stepping one frame at a time in both directions and scrubbing to a specific frame.
-- **FR-008**: System MUST display the current position as an exact integer frame number.
+- **FR-007a**: System MUST show a timeline the user can drag to move through a video, in both preview modes, together with the elapsed and total running time. Dragging MAY settle approximately while the finger is down; on release the position MUST become exact for a downloaded copy, so that a marker placed straight after a drag lands on the frame shown.
+- **FR-008**: System MUST display the current position as an exact integer frame number, and MUST keep that display current while the video plays rather than only after a seek.
 - **FR-009**: Users MUST be able to clear the local cache for a folder, removing cached video copies without affecting Drive contents, locally held metadata, or pending saves.
 - **FR-010**: System MUST keep a cached video on the device until the user clears it — surviving app restarts, and not silently removed by the system when storage runs low. There is no automatic eviction, and no separate action is needed to make a video available offline: opening it is enough.
 
@@ -152,13 +157,14 @@ The creator works across several shoots, each in its own Drive folder. They swit
 - **FR-012**: System MUST read source timecode from the video file where present, and record its absence explicitly where it is not, without substituting a default.
 - **FR-013**: Users MUST be able to author free-text comments for a whole video.
 - **FR-014**: Users MUST be able to add and remove keywords on a whole video.
+- **FR-014a**: Users MUST be able to author, at the whole-video level, a Description (free text, distinct from Comments), a list of People, and a Good Take flag. These are recorded in the canonical record (schema v2) and projected into the editor's whole-video metadata alongside Comments and Keywords, each as its own field.
 - **FR-015**: Users MUST be able to add, edit, and delete markers within a video, each with a position, a name, a note, and a color.
 - **FR-016**: System MUST store every marker position as an integer frame offset paired with the video's exact frame rate, never as a rounded or approximated time value.
 - **FR-017**: Users MUST be able to give a marker a duration (a range) or leave it at a single frame (a point).
 - **FR-018**: System MUST record that each authored value was entered manually by the user (provenance), so later automatically generated values can be distinguished from hand-authored ones.
 - **FR-019**: System MUST reject authoring frame-accurate markers on a video whose exact frame rate cannot be determined, and tell the user why, rather than approximating positions.
 - **FR-019a**: System MUST detect footage whose frame spacing is not constant (variable frame rate). On such a video it MUST still allow playback, comments, and keywords, but MUST disable marker authoring and explain that frame positions cannot be guaranteed for that file. It MUST NOT write markers for a video it has identified as variable rate.
-- **FR-020**: System MUST NOT offer scene/shot/take fields, ratings, status, or color labels at the whole-video level in this version.
+- **FR-020**: System MUST NOT offer scene/shot/take fields or color labels at the whole-video level in this version. (A Description, a People list, and a Good Take flag ARE offered — see FR-014a; these superseded the original blanket exclusion.)
 
 **Reading existing metadata**
 
@@ -179,7 +185,7 @@ The creator works across several shoots, each in its own Drive folder. They swit
 - **FR-029**: System MUST indicate when a video has unsaved changes and warn before those changes would be discarded.
 - **FR-029a**: Users MUST be able to remove a video's metadata by clearing it: when a video with no comments, no keywords, and no markers is saved, the system MUST delete that video's existing sidecars from Drive rather than writing empty ones, and MUST tell the user the metadata was removed. Saving an already-empty video that has no sidecars MUST do nothing.
 - **FR-030**: System MUST record in the canonical file which schema version it was written against, and pin the timeline file to a specific known schema version.
-- **FR-031**: Markers MUST reach the editor through the timeline file; the whole-video metadata file carries only comments and keywords, which is a known and accepted limitation of that format.
+- **FR-031**: Markers MUST reach the editor through the timeline file; the whole-video metadata file carries the whole-video fields (comments, keywords, description, people, good take) but not markers, which is a known and accepted limitation of that format. Each marker's note MUST be carried in the timeline format's native marker comment field, so the editor surfaces it, rather than in an application-private metadata block the editor ignores.
 
 **Offline authoring and sync**
 
@@ -234,8 +240,8 @@ The creator works across several shoots, each in its own Drive folder. They swit
 - Single user per installation, using their own Google account. No teams, sharing, collaboration, or permission model beyond what Drive itself enforces.
 - The app is for personal use. Publishing to a store — and the Google review that a broad Drive access scope would trigger — is out of scope for this version.
 - All metadata is authored by hand. No automatic generation (speech-to-text, shot detection, object detection) in this version.
-- Out of scope for this version: proxy or lower-quality downloads, on-device transcoding, FCPXML export, Android, and streaming preview without a full download.
-- Frame-accurate work requires a downloaded copy; the app does not attempt frame accuracy against a stream.
+- Out of scope for this version: proxy or lower-quality downloads, on-device transcoding, FCPXML export, and Android.
+- Frame-accurate work requires a downloaded copy; the app does not attempt frame accuracy against a stream. Streaming exists for watching and for whole-video metadata only (FR-006c) — the line between the two modes is drawn at exactness, not at convenience.
 
 **Behavior chosen where the source description left it open**
 
@@ -248,7 +254,7 @@ The creator works across several shoots, each in its own Drive folder. They swit
 - **Cache eviction**: the cache is cleared manually per folder. No automatic size cap or age-based eviction in this version.
 - **Offline**: authoring is fully available offline for any cached video, and confirmed saves queue and publish on reconnect (FR-032 to FR-040). Only the operations that inherently need Drive require connectivity: adding a folder, listing a folder's videos, and downloading an original. A video must have been opened at least once while connected to be usable offline.
 - **Offline conflict window**: a queued save may publish hours after it was authored, and still overwrites whatever is in Drive (last write wins). Acceptable for a single user on a single device, where nothing else writes these sidecars.
-- **Video discovery**: the app lists videos directly in a connected folder and does not recurse into subfolders.
+- **Video discovery**: the app lists a folder's videos and lets the user descend into its subfolders to reach more (FR-004a). Subfolder listings are fetched live, so descending into a not-yet-visited subfolder needs a connection; a subfolder's videos become offline-available once browsed.
 
 **Dependencies and environment**
 
