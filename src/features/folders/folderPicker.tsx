@@ -9,7 +9,7 @@
 
 import * as React from 'react';
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { type DriveFile, listFolders } from '@/data/drive/files';
 import { Button, Empty, Loading } from '@/ui/components';
@@ -61,69 +61,76 @@ export function FolderPicker({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Pressable onPress={onCancel} accessibilityRole="button">
-            <Text style={styles.cancel}>Cancel</Text>
-          </Pressable>
-          <Text style={styles.title} numberOfLines={1}>
-            {current.name}
-          </Text>
-          <View style={styles.headerSpacer} />
-        </View>
+      {/* A Modal is its own iOS window, outside the root view the app-level
+          SafeAreaProvider measures. Without a provider *inside* it, insets read
+          zero and the header rides up under the status bar clock. */}
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+          <View style={styles.header}>
+            <Pressable onPress={onCancel} accessibilityRole="button">
+              <Text style={styles.cancel}>Cancel</Text>
+            </Pressable>
+            <Text style={styles.title} numberOfLines={1}>
+              {current.name}
+            </Text>
+            <View style={styles.headerSpacer} />
+          </View>
 
-        {crumbs.length > 1 ? (
-          <Pressable
-            style={styles.up}
-            accessibilityRole="button"
-            onPress={() => setCrumbs((c) => c.slice(0, -1))}
-          >
-            <Text style={styles.upLabel}>‹ {crumbs[crumbs.length - 2]?.name}</Text>
-          </Pressable>
-        ) : null}
-
-        {error ? (
-          <Empty title="Could not read Drive" detail={error} />
-        ) : folders === null ? (
-          <Loading label="Reading Drive…" />
-        ) : folders.length === 0 ? (
-          <Empty
-            title="No subfolders here"
-            detail="You can still connect this folder if your videos are in it."
-          />
-        ) : (
-          <FlatList
-            data={folders}
-            keyExtractor={(f) => f.id}
-            renderItem={({ item }) => (
-              <Pressable
-                style={styles.row}
-                accessibilityRole="button"
-                onPress={() => setCrumbs((c) => [...c, { id: item.id, name: item.name }])}
-              >
-                <Text style={styles.rowLabel} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.chevron}>›</Text>
-              </Pressable>
-            )}
-          />
-        )}
-
-        <View style={styles.footer}>
-          <Button
-            label={`Connect “${current.name}”`}
-            disabled={current.id === 'root'}
-            onPress={() => {
-              onPick({ id: current.id, name: current.name });
-              reset();
-            }}
-          />
-          {current.id === 'root' ? (
-            <Text style={styles.hint}>Open a folder to connect it.</Text>
+          {crumbs.length > 1 ? (
+            <Pressable
+              style={styles.up}
+              accessibilityRole="button"
+              onPress={() => setCrumbs((c) => c.slice(0, -1))}
+            >
+              <Text style={styles.upLabel}>‹ {crumbs[crumbs.length - 2]?.name}</Text>
+            </Pressable>
           ) : null}
-        </View>
-      </SafeAreaView>
+
+          {error ? (
+            <Empty title="Could not read Drive" detail={error} />
+          ) : folders === null ? (
+            <Loading label="Reading Drive…" />
+          ) : folders.length === 0 ? (
+            <Empty
+              title="No subfolders here"
+              detail="You can still connect this folder if your videos are in it."
+            />
+          ) : (
+            <FlatList
+              data={folders}
+              keyExtractor={(f) => f.id}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.row}
+                  accessibilityRole="button"
+                  onPress={() =>
+                    setCrumbs((c) => [...c, { id: item.id, name: item.name }])
+                  }
+                >
+                  <Text style={styles.rowLabel} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.chevron}>›</Text>
+                </Pressable>
+              )}
+            />
+          )}
+
+          <View style={styles.footer}>
+            <Button
+              label={`Connect “${current.name}”`}
+              disabled={current.id === 'root'}
+              onPress={() => {
+                onPick({ id: current.id, name: current.name });
+                reset();
+              }}
+            />
+            {current.id === 'root' ? (
+              <Text style={styles.hint}>Open a folder to connect it.</Text>
+            ) : null}
+          </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }
@@ -138,7 +145,13 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.border,
   },
   cancel: { color: theme.accent, fontSize: 16, width: 70 },
-  title: { color: theme.text, fontSize: 17, fontWeight: '600', flex: 1, textAlign: 'center' },
+  title: {
+    color: theme.text,
+    fontSize: 17,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+  },
   headerSpacer: { width: 70 },
   up: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   upLabel: { color: theme.accent, fontSize: 15 },
@@ -157,5 +170,10 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.border,
   },
-  hint: { color: theme.textDim, fontSize: 13, textAlign: 'center', marginTop: spacing.sm },
+  hint: {
+    color: theme.textDim,
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: spacing.sm,
+  },
 });

@@ -24,7 +24,7 @@ import {
   videos,
   type VideoRow,
 } from '@/data/db/repositories';
-import { listVideos } from '@/data/drive/files';
+import { listFolders, listVideos, type DriveFile } from '@/data/drive/files';
 import * as queue from '@/data/sync/queue';
 import { formatBytes } from '@/features/library/openVideo';
 import {
@@ -34,6 +34,7 @@ import {
   useDrive,
 } from '@/ui/AppProviders';
 import { Badge, Banner, Button, Empty, Loading } from '@/ui/components';
+import { useDownloads } from '@/ui/DownloadHost';
 import { spacing, theme } from '@/ui/theme';
 
 type SortKey = 'name' | 'metadata' | 'downloaded';
@@ -45,13 +46,21 @@ export default function FolderScreen(): React.ReactElement {
 }
 
 function Screen(): React.ReactElement {
-  const { folderId } = useLocalSearchParams<{ folderId: string }>();
+  const { folderId, name: nameParam } = useLocalSearchParams<{
+    folderId: string;
+    name?: string;
+  }>();
   const db = useDatabase();
   const drive = useDrive();
   const { online } = useConnectivity();
+  const { items: downloadItems } = useDownloads();
 
-  const [name, setName] = React.useState('Videos');
+  // When we arrive by tapping a subfolder we already know its name (passed in the
+  // route), so the header reads correctly before Drive answers. A saved folder's
+  // name from the DB still wins once loadLocal runs.
+  const [name, setName] = React.useState(nameParam ?? 'Videos');
   const [rows, setRows] = React.useState<VideoRow[] | null>(null);
+  const [subfolders, setSubfolders] = React.useState<DriveFile[]>([]);
   const [withMetadata, setWithMetadata] = React.useState<Set<string>>(new Set());
   const [pending, setPending] = React.useState<Set<string>>(new Set());
   const [allKeywords, setAllKeywords] = React.useState<string[]>([]);
@@ -86,7 +95,12 @@ function Screen(): React.ReactElement {
     if (!folderId || !online) return;
     setError(null);
     try {
-      const files = await listVideos(drive, folderId);
+      // Videos live here; subfolders are the branches the user can descend into
+      // (FR-004a). Fetched together so one refresh reflects the whole level.
+      const [files, subs] = await Promise.all([
+        listVideos(drive, folderId),
+        listFolders(drive, folderId),
+      ]);
       await videos.upsertMany(
         db,
         folderId,
@@ -98,6 +112,7 @@ function Screen(): React.ReactElement {
           thumbnailUrl: f.thumbnailLink ?? null,
         })),
       );
+      setSubfolders(subs);
       await folders.touch(db, folderId);
       await loadLocal();
     } catch (err) {
@@ -201,8 +216,10 @@ function Screen(): React.ReactElement {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          style={styles.bar}
           contentContainerStyle={styles.chips}
         >
+          <Text style={styles.barLabel}>Filter</Text>
           <Chip label="All" active={filter === null} onPress={() => setFilter(null)} />
           {allKeywords.map((k) => (
             <Chip
@@ -215,42 +232,78 @@ function Screen(): React.ReactElement {
         </ScrollView>
       ) : null}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-        <Text style={styles.sortLabel}>Sort</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.bar}
+        contentContainerStyle={styles.chips}
+      >
+        <Text style={styles.barLabel}>Sort</Text>
         <Chip label="Name" active={sort === 'name'} onPress={() => setSort('name')} />
         <Chip label="Has metadata" active={sort === 'metadata'} onPress={() => setSort('metadata')} />
         <Chip label="Downloaded" active={sort === 'downloaded'} onPress={() => setSort('downloaded')} />
       </ScrollView>
 
-      {visible === null ? (
-        <Loading />
-      ) : visible.length === 0 ? (
-        <Empty
-          title={filter ? `No videos tagged “${filter}”` : 'No videos in this folder'}
-          detail={
-            filter
-              ? undefined
-              : online
-                ? 'Rushmark looks for video files directly in this folder, not in subfolders.'
-                : 'Connect to the network to load this folder’s contents.'
-          }
-        />
-      ) : (
-        <FlatList
-          data={visible}
-          keyExtractor={(v) => v.id}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              tintColor={theme.textDim}
-              onRefresh={() => {
-                setRefreshing(true);
-                void refreshFromDrive().finally(() => setRefreshing(false));
-              }}
+      <FlatList
+        data={visible ?? []}
+        keyExtractor={(v) => v.id}
+        style={styles.listFlex}
+        contentContainerStyle={styles.list}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={theme.textDim}
+            onRefresh={() => {
+              setRefreshing(true);
+              void refreshFromDrive().finally(() => setRefreshing(false));
+            }}
+          />
+        }
+        ListHeaderComponent={
+          subfolders.length > 0 && !filter ? (
+            <View style={styles.folderSection}>
+              {subfolders.map((f) => (
+                <Link
+                  key={f.id}
+                  href={{
+                    pathname: '/folder/[folderId]',
+                    params: { folderId: f.id, name: f.name },
+                  }}
+                  asChild
+                >
+                  <Pressable style={styles.folderRow} accessibilityRole="button">
+                    <Text style={styles.folderIcon}>📁</Text>
+                    <Text style={styles.folderName} numberOfLines={1}>
+                      {f.name}
+                    </Text>
+                    <Text style={styles.chevron}>›</Text>
+                  </Pressable>
+                </Link>
+              ))}
+            </View>
+          ) : null
+        }
+        ListEmptyComponent={
+          visible === null ? (
+            <Loading />
+          ) : (
+            <Empty
+              title={filter ? `No videos tagged “${filter}”` : 'No videos here'}
+              detail={
+                filter
+                  ? undefined
+                  : subfolders.length > 0
+                    ? 'This folder holds only subfolders — open one above to find its videos.'
+                    : online
+                      ? 'This folder has no videos or subfolders.'
+                      : 'Connect to the network to load this folder’s contents.'
+              }
             />
-          }
-          renderItem={({ item }) => (
+          )
+        }
+        renderItem={({ item }) => {
+          const dl = downloadItems.get(item.id);
+          return (
             <Link href={`/video/${item.id}`} asChild>
               <Pressable style={styles.row} accessibilityRole="button">
                 {item.thumbnailUrl ? (
@@ -263,6 +316,12 @@ function Screen(): React.ReactElement {
                     {item.filename}
                   </Text>
                   <View style={styles.badges}>
+                    {dl?.phase === 'downloading' ? (
+                      <Badge
+                        label={`↓ ${Math.round((dl.fraction ?? 0) * 100)}%`}
+                        color={theme.warning}
+                      />
+                    ) : null}
                     {withMetadata.has(item.id) ? (
                       <Badge label="METADATA" color={theme.success} />
                     ) : null}
@@ -277,9 +336,9 @@ function Screen(): React.ReactElement {
                 </View>
               </Pressable>
             </Link>
-          )}
-        />
-      )}
+          );
+        }}
+      />
 
       {cacheBytes > 0 ? (
         <View style={styles.footer}>
@@ -318,8 +377,11 @@ function Chip({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.bg },
   bannerWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  // A horizontal ScrollView with no height grabs free vertical space; flexGrow: 0
+  // pins each bar to its content so the two rows sit snug above the list.
+  bar: { flexGrow: 0 },
   chips: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, gap: spacing.sm, alignItems: 'center' },
-  sortLabel: { color: theme.textDim, fontSize: 12, marginRight: spacing.xs },
+  barLabel: { color: theme.textDim, fontSize: 12, marginRight: spacing.xs },
   chip: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
@@ -331,7 +393,21 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: theme.accent, borderColor: theme.accent },
   chipLabel: { color: theme.textDim, fontSize: 13 },
   chipLabelActive: { color: theme.text, fontWeight: '600' },
-  list: { padding: spacing.lg, gap: spacing.md },
+  listFlex: { flex: 1 },
+  list: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
+  folderSection: { gap: spacing.md, marginBottom: spacing.md },
+  folderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: theme.surface,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  folderIcon: { fontSize: 20 },
+  folderName: { flex: 1, color: theme.text, fontSize: 15, fontWeight: '500' },
+  chevron: { color: theme.textDim, fontSize: 22, marginLeft: spacing.xs },
   row: {
     flexDirection: 'row',
     backgroundColor: theme.surface,
