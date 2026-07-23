@@ -25,7 +25,12 @@ export type OpenState =
  */
 export async function inspect(
   db: SQLite.SQLiteDatabase,
-  input: { videoId: string; folderId: string; filename: string; sizeBytes: number | null },
+  input: {
+    videoId: string;
+    folderId: string;
+    filename: string;
+    sizeBytes: number | null;
+  },
 ): Promise<OpenState> {
   const path = await videoCache.cachedPath(input.folderId, input.filename);
   if (path) return { kind: 'cached', path };
@@ -41,6 +46,23 @@ export async function inspect(
   }
 
   return { kind: 'needs-download', sizeBytes: input.sizeBytes, onCellular: cellular };
+}
+
+/**
+ * Where to stream a video from, for preview without downloading (FR-006c).
+ *
+ * The token is fetched per call rather than cached: AVFoundation holds these
+ * headers for the life of the asset, so a stale one would surface as a mid-clip
+ * playback stall with no explanation. Short-lived handles keep that honest.
+ */
+export async function streamSource(
+  driveFileId: string,
+): Promise<{ url: string; headers: Record<string, string> }> {
+  const token = await getAccessToken();
+  return {
+    url: mediaUrl(driveFileId),
+    headers: { Authorization: `Bearer ${token}` },
+  };
 }
 
 export type DownloadHandle = {

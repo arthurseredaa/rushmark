@@ -38,6 +38,29 @@ export function framesToTimecode(frames: number, rate: Rational): string {
 }
 
 /**
+ * Integer frames -> elapsed wall-clock, "M:SS" or "H:MM:SS".
+ *
+ * Distinct from timecode on purpose. Timecode counts labelled frames, so a
+ * 23.976 clip's timecode runs ~0.1% ahead of the clock; this is the honest
+ * elapsed duration, for a viewer watching a preview rather than an editor
+ * matching an edit.
+ *
+ * Exact by construction: seconds = frames * den / num in integer arithmetic,
+ * truncated. No float, and no rounded label count.
+ */
+export function framesToClock(frames: number, { num, den }: Rational): string {
+  if (!Number.isInteger(frames) || frames < 0) {
+    throw new Error(`frames must be a non-negative integer: ${frames}`);
+  }
+  const totalSeconds = Math.floor((frames * den) / num);
+  const s = totalSeconds % 60;
+  const m = Math.floor(totalSeconds / 60) % 60;
+  const h = Math.floor(totalSeconds / 3600);
+  const p = (n: number): string => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`;
+}
+
+/**
  * "HH:MM:SS:FF" -> integer frames (non-drop). Returns null if unparseable.
  *
  * Null rather than a guess: Principle I requires refusing when a value cannot

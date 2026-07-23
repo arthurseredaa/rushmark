@@ -29,9 +29,16 @@ export type NativeProbe = {
 type FramePlayerNativeModule = {
   probe(uri: string): Promise<NativeProbe>;
   load(handleId: string, uri: string): Promise<NativeProbe>;
+  loadRemote(
+    handleId: string,
+    uri: string,
+    headers: Record<string, string>,
+  ): Promise<NativeProbe>;
   unload(handleId: string): Promise<void>;
   /** Resolves with the frame ACTUALLY landed on, which may differ from `frame`. */
   seekToFrame(handleId: string, frame: number): Promise<number>;
+  /** Fast, openly approximate seek for dragging a timeline. */
+  scrubToFrame(handleId: string, frame: number): Promise<number>;
   /** Resolves with the frame actually landed on. */
   stepByFrames(handleId: string, count: number): Promise<number>;
   currentFrame(handleId: string): Promise<number>;
@@ -59,16 +66,38 @@ export const toDomainProbe = (p: NativeProbe): Probe => ({
   sourceTimecodeFrames: p.sourceTimecodeFrames,
 });
 
+const newHandleId = (): string =>
+  `fp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
 export class FramePlayer {
   private constructor(
     readonly handleId: string,
     readonly probeResult: NativeProbe,
+    /** True when the media is being read over the network rather than off disk. */
+    readonly streaming: boolean,
   ) {}
 
   static async load(uri: string): Promise<FramePlayer> {
-    const handleId = `fp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const handleId = newHandleId();
     const probeResult = await native.load(handleId, uri);
-    return new FramePlayer(handleId, probeResult);
+    return new FramePlayer(handleId, probeResult, false);
+  }
+
+  /**
+   * Play from a URL without downloading it first.
+   *
+   * The returned probe is shallow — `rateMode` is always `unknown` and there is
+   * no source timecode — because confirming either means reading sample data the
+   * network has not sent. Callers must not treat a streamed probe as the
+   * canonical technical record, and must not place markers against it.
+   */
+  static async loadRemote(
+    uri: string,
+    headers: Record<string, string>,
+  ): Promise<FramePlayer> {
+    const handleId = newHandleId();
+    const probeResult = await native.loadRemote(handleId, uri, headers);
+    return new FramePlayer(handleId, probeResult, true);
   }
 
   /**
@@ -83,6 +112,20 @@ export class FramePlayer {
       throw new Error(`seekToFrame requires an integer frame: ${frame}`);
     }
     return native.seekToFrame(this.handleId, frame);
+  }
+
+  /**
+   * Approximate seek, for the live part of a timeline drag.
+   *
+   * Returns roughly where playback landed — within about half a second. The
+   * result is for showing a picture under the finger and MUST NOT be used as a
+   * marker position: commit a drag with `seekToFrame` and use that value.
+   */
+  scrubToFrame(frame: number): Promise<number> {
+    if (!Number.isInteger(frame)) {
+      throw new Error(`scrubToFrame requires an integer frame: ${frame}`);
+    }
+    return native.scrubToFrame(this.handleId, frame);
   }
 
   /** Step by whole frames. Returns the frame actually landed on. */

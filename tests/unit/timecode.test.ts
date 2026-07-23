@@ -9,7 +9,40 @@
  */
 
 import { SUPPORTED_RATES, formatRate, type Rational } from '@/domain/rational';
-import { framesToTimecode, labelledFps, timecodeToFrames } from '@/domain/timecode';
+import {
+  framesToClock,
+  framesToTimecode,
+  labelledFps,
+  timecodeToFrames,
+} from '@/domain/timecode';
+
+describe('framesToClock', () => {
+  it('reports elapsed wall-clock, not labelled frames', () => {
+    // The distinction that matters: at 24000/1001 one second of timecode is
+    // 24 frames, but 24 frames is 1001/1000 s of real time. At 1000 seconds of
+    // timecode the clock is a full second behind — silently reusing timecode
+    // here would drift visibly on a long clip.
+    const ndf = { num: 24000, den: 1001 };
+    expect(framesToClock(0, ndf)).toBe('0:00');
+    expect(framesToClock(24, ndf)).toBe('0:01');
+    expect(framesToClock(24000, ndf)).toBe('16:41'); // 1001 s, not 1000
+    expect(framesToTimecode(24000, ndf)).toBe('00:16:40:00');
+  });
+
+  it('grows an hours field only when there is one', () => {
+    const rate = { num: 25, den: 1 };
+    expect(framesToClock(25 * 59, rate)).toBe('0:59');
+    expect(framesToClock(25 * 60, rate)).toBe('1:00');
+    expect(framesToClock(25 * 3600, rate)).toBe('1:00:00');
+    expect(framesToClock(25 * 3661, rate)).toBe('1:01:01');
+  });
+
+  it('refuses anything that is not a non-negative integer frame', () => {
+    const rate = { num: 30, den: 1 };
+    expect(() => framesToClock(-1, rate)).toThrow();
+    expect(() => framesToClock(1.5, rate)).toThrow();
+  });
+});
 
 describe('labelledFps', () => {
   it('maps fractional rates to their label count', () => {
