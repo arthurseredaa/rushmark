@@ -12,7 +12,7 @@ import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { type DriveFile, listFolders } from '@/data/drive/files';
-import { Button, Empty, Loading } from '@/ui/components';
+import { Empty, Loading } from '@/ui/components';
 import { useDrive } from '@/ui/AppProviders';
 import { spacing, theme } from '@/ui/theme';
 
@@ -73,7 +73,20 @@ export function FolderPicker({
             <Text style={styles.title} numberOfLines={1}>
               {current.name}
             </Text>
-            <View style={styles.headerSpacer} />
+            {current.id === 'root' ? (
+              <View style={styles.headerSpacer} />
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                hitSlop={{ top: spacing.lg, bottom: spacing.lg }}
+                onPress={() => {
+                  onPick({ id: current.id, name: current.name });
+                  reset();
+                }}
+              >
+                <Text style={styles.add}>Add</Text>
+              </Pressable>
+            )}
           </View>
 
           {crumbs.length > 1 ? (
@@ -115,20 +128,6 @@ export function FolderPicker({
               )}
             />
           )}
-
-          <View style={styles.footer}>
-            <Button
-              label={`Connect “${current.name}”`}
-              disabled={current.id === 'root'}
-              onPress={() => {
-                onPick({ id: current.id, name: current.name });
-                reset();
-              }}
-            />
-            {current.id === 'root' ? (
-              <Text style={styles.hint}>Open a folder to connect it.</Text>
-            ) : null}
-          </View>
         </SafeAreaView>
       </SafeAreaProvider>
     </Modal>
@@ -152,6 +151,7 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
+  add: { color: theme.accent, fontSize: 16, textAlign: 'right', width: 70 },
   headerSpacer: { width: 70 },
   up: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
   upLabel: { color: theme.accent, fontSize: 15 },
@@ -165,15 +165,4 @@ const styles = StyleSheet.create({
   },
   rowLabel: { color: theme.text, fontSize: 16, flex: 1 },
   chevron: { color: theme.textDim, fontSize: 20 },
-  footer: {
-    padding: spacing.lg,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.border,
-  },
-  hint: {
-    color: theme.textDim,
-    fontSize: 13,
-    textAlign: 'center',
-    marginTop: spacing.sm,
-  },
 });
